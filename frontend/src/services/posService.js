@@ -105,6 +105,11 @@ export async function upsertMemberAccountFollowup(body = {}) {
   return payload(data);
 }
 
+export async function getMemberAccountPromiseAgenda(params = {}) {
+  const { data } = await api.get('/pos/member-account/promise-agenda', { params });
+  return payload(data);
+}
+
 export async function settleMemberAccountCharge(id, body = {}) {
   const { data } = await api.post(`/pos/member-account/charges/${id}/settle`, body);
   return payload(data);

@@ -285,6 +285,36 @@ final class PosService
         ];
     }
 
+    public function getMemberAccountPromiseAgenda(int $tenantId, int $gymId, mixed $limitInput): array
+    {
+        $limit = is_numeric($limitInput) ? (int) $limitInput : 20;
+        if ($limit < 1) {
+            $limit = 20;
+        }
+        if ($limit > 100) {
+            $limit = 100;
+        }
+
+        $summary = $this->repo->getMemberAccountPromiseAgendaSummary($tenantId, $gymId);
+        $rows = $this->repo->listMemberAccountPromiseAgendaItems($tenantId, $gymId, $limit);
+        return [
+            'today' => date('Y-m-d'),
+            'due_today_count' => (int) ($summary['due_today_count'] ?? 0),
+            'overdue_count' => (int) ($summary['overdue_count'] ?? 0),
+            'items' => array_map(static fn (array $row): array => [
+                'member_id' => (int) ($row['member_id'] ?? 0),
+                'member_code' => (string) ($row['member_code'] ?? ''),
+                'first_name' => (string) ($row['first_name'] ?? ''),
+                'last_name' => (string) ($row['last_name'] ?? ''),
+                'promise_date' => (string) ($row['promise_date'] ?? ''),
+                'notes' => (string) ($row['notes'] ?? ''),
+                'updated_at' => (string) ($row['updated_at'] ?? ''),
+                'overdue_total_amount' => (float) ($row['overdue_total_amount'] ?? 0),
+                'overdue_charges_count' => (int) ($row['overdue_charges_count'] ?? 0),
+            ], $rows),
+        ];
+    }
+
     public function buildMemberOverdueWhatsAppLink(int $tenantId, int $gymId, int $memberId, ?int $actorUserId = null): array
     {
         if ($memberId <= 0) {

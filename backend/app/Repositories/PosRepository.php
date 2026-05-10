@@ -1887,4 +1887,61 @@ final class PosRepository
         ]);
         return $stmt->fetch() ?: [];
     }
+
+    public function getMemberAccountPromiseAgendaSummary(int $tenantId, int $gymId): array
+    {
+        $stmt = Database::connection()->prepare(
+            'SELECT
+                COALESCE(SUM(CASE WHEN status = "promise" AND promise_date = CURDATE() THEN 1 ELSE 0 END), 0) AS due_today_count,
+                COALESCE(SUM(CASE WHEN status = "promise" AND promise_date < CURDATE() THEN 1 ELSE 0 END), 0) AS overdue_count
+             FROM member_account_followups
+             WHERE tenant_id = :tenant_id
+               AND gym_id = :gym_id'
+        );
+        $stmt->execute([
+            'tenant_id' => $tenantId,
+            'gym_id' => $gymId,
+        ]);
+        return $stmt->fetch() ?: [];
+    }
+
+    public function listMemberAccountPromiseAgendaItems(int $tenantId, int $gymId, int $limit = 20): array
+    {
+        $stmt = Database::connection()->prepare(
+            'SELECT
+                f.member_id,
+                f.promise_date,
+                f.notes,
+                f.updated_at,
+                m.member_code,
+                m.first_name,
+                m.last_name,
+                COALESCE(SUM(c.amount), 0) AS overdue_total_amount,
+                COUNT(c.id) AS overdue_charges_count
+             FROM member_account_followups f
+             INNER JOIN members m
+               ON m.id = f.member_id
+              AND m.tenant_id = f.tenant_id
+              AND m.gym_id = f.gym_id
+             LEFT JOIN member_account_charges c
+               ON c.member_id = f.member_id
+              AND c.tenant_id = f.tenant_id
+              AND c.gym_id = f.gym_id
+              AND c.status = "pending_auto_debit"
+              AND c.due_date IS NOT NULL
+              AND c.due_date <= CURDATE()
+             WHERE f.tenant_id = :tenant_id
+               AND f.gym_id = :gym_id
+               AND f.status = "promise"
+               AND f.promise_date IS NOT NULL
+             GROUP BY f.member_id, f.promise_date, f.notes, f.updated_at, m.member_code, m.first_name, m.last_name
+             ORDER BY CASE WHEN f.promise_date < CURDATE() THEN 0 ELSE 1 END, f.promise_date ASC, overdue_total_amount DESC
+             LIMIT :limit'
+        );
+        $stmt->bindValue(':tenant_id', $tenantId, \PDO::PARAM_INT);
+        $stmt->bindValue(':gym_id', $gymId, \PDO::PARAM_INT);
+        $stmt->bindValue(':limit', $limit, \PDO::PARAM_INT);
+        $stmt->execute();
+        return $stmt->fetchAll() ?: [];
+    }
 }

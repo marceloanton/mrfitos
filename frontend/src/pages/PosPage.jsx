@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { adjustStock, autoSettleMemberAccountCharges, closeCashSession, createPosAlertContact, createPosProduct, createPosSale, deletePosAlertContact, exportPosAlertDispatchHistoryCsv, exportPosAuditCsv, exportPosAutosettleKpiCsv, exportPosZCloseCsv, getCashByOperatorReport, getCashSessionReport, getMemberAccountAging, getMemberAccountCollectionsKpiToday, getMemberAccountFollowupFunnel, getMemberAccountOverdueWhatsAppLink, getOpenCashSessionSummary, getPosAlertNotifyLink, getPosAlerts, getPosAlertsStatus, getPosAutosettleKpi, getPosConfig, getPosSaleReceipt, getPosSaleReceiptByNumber, getPosSummary, getPosZCloseReport, listCashSessions, listLowStockProducts, listMemberAccountCharges, listPosAlertContacts, listPosAlertDispatchHistory, listPosAlertsCronHistory, listPosAudit, listPosProducts, listPosSales, listStockMovements, notifyCriticalPosAlert, openCashSession, settleMemberAccountCharge, updatePosAlertContact, updatePosConfig, upsertMemberAccountFollowup, voidPosSale } from '../services/posService';
+import { adjustStock, autoSettleMemberAccountCharges, closeCashSession, createPosAlertContact, createPosProduct, createPosSale, deletePosAlertContact, exportPosAlertDispatchHistoryCsv, exportPosAuditCsv, exportPosAutosettleKpiCsv, exportPosZCloseCsv, getCashByOperatorReport, getCashSessionReport, getMemberAccountAging, getMemberAccountCollectionsKpiToday, getMemberAccountFollowupFunnel, getMemberAccountOverdueWhatsAppLink, getMemberAccountPromiseAgenda, getOpenCashSessionSummary, getPosAlertNotifyLink, getPosAlerts, getPosAlertsStatus, getPosAutosettleKpi, getPosConfig, getPosSaleReceipt, getPosSaleReceiptByNumber, getPosSummary, getPosZCloseReport, listCashSessions, listLowStockProducts, listMemberAccountCharges, listPosAlertContacts, listPosAlertDispatchHistory, listPosAlertsCronHistory, listPosAudit, listPosProducts, listPosSales, listStockMovements, notifyCriticalPosAlert, openCashSession, settleMemberAccountCharge, updatePosAlertContact, updatePosConfig, upsertMemberAccountFollowup, voidPosSale } from '../services/posService';
 import { useAuthStore } from '../stores/authStore';
 
 export default function PosPage() {
@@ -101,6 +101,11 @@ export default function PosPage() {
     promise_count: 0,
     paid_count: 0
   });
+  const [promiseAgenda, setPromiseAgenda] = useState({
+    due_today_count: 0,
+    overdue_count: 0,
+    items: []
+  });
   const [summary, setSummary] = useState({
     today_sales_count: 0,
     today_sales_total: 0,
@@ -110,7 +115,7 @@ export default function PosPage() {
 
   const load = async () => {
     try {
-      const [salesData, chargesData, productsData, movementsData, openCashData, cashSessionsData, posConfig, summaryData, lowStockData, cashByOperatorData, auditData, alertsData, contactsData, dispatchHistoryData, alertsStatusData, alertsCronHistoryData, autosettleKpiData, memberAccountAgingData, collectionsKpiData, followupFunnelData] = await Promise.all([
+      const [salesData, chargesData, productsData, movementsData, openCashData, cashSessionsData, posConfig, summaryData, lowStockData, cashByOperatorData, auditData, alertsData, contactsData, dispatchHistoryData, alertsStatusData, alertsCronHistoryData, autosettleKpiData, memberAccountAgingData, collectionsKpiData, followupFunnelData, promiseAgendaData] = await Promise.all([
         listPosSales({ page: 1, per_page: 20 }),
         listMemberAccountCharges({ status: 'pending_auto_debit', page: 1, per_page: 20 }),
         listPosProducts(),
@@ -153,7 +158,8 @@ export default function PosPage() {
         getMemberAccountFollowupFunnel({
           date_from: followupDateFrom || undefined,
           date_to: followupDateTo || undefined
-        })
+        }),
+        getMemberAccountPromiseAgenda({ limit: 20 })
       ]);
       setSales(Array.isArray(salesData?.items) ? salesData.items : []);
       setCharges(Array.isArray(chargesData?.items) ? chargesData.items : []);
@@ -206,6 +212,11 @@ export default function PosPage() {
         contacted_count: Number(followupFunnelData?.contacted_count ?? 0),
         promise_count: Number(followupFunnelData?.promise_count ?? 0),
         paid_count: Number(followupFunnelData?.paid_count ?? 0)
+      });
+      setPromiseAgenda({
+        due_today_count: Number(promiseAgendaData?.due_today_count ?? 0),
+        overdue_count: Number(promiseAgendaData?.overdue_count ?? 0),
+        items: Array.isArray(promiseAgendaData?.items) ? promiseAgendaData.items : []
       });
     } catch {
       // no-op
@@ -807,6 +818,16 @@ ${sale.notes ? `Nota: ${sale.notes}` : ''}
             <p className="text-lg font-semibold text-emerald-700">{followupFunnel.paid_count}</p>
           </div>
         </div>
+        <div className="mb-3 grid gap-2 md:grid-cols-2">
+          <div className="rounded border border-slate-200 p-2">
+            <p className="text-xs uppercase tracking-wide text-slate-500">Promesas para hoy</p>
+            <p className="text-lg font-semibold text-slate-900">{promiseAgenda.due_today_count}</p>
+          </div>
+          <div className="rounded border border-red-200 p-2">
+            <p className="text-xs uppercase tracking-wide text-red-600">Promesas vencidas</p>
+            <p className="text-lg font-semibold text-red-700">{promiseAgenda.overdue_count}</p>
+          </div>
+        </div>
         <h3 className="mb-2 text-lg font-semibold text-slate-900">Morosidad cuenta socio</h3>
         <div className="mb-3 grid gap-2 md:grid-cols-4">
           <div className="rounded border border-slate-200 p-2">
@@ -864,6 +885,17 @@ ${sale.notes ? `Nota: ${sale.notes}` : ''}
                   WhatsApp
                 </button>
               </div>
+            </div>
+          ))}
+        </div>
+        <div className="mt-4 space-y-2">
+          <p className="text-sm font-medium text-slate-700">Agenda de promesas</p>
+          {promiseAgenda.items.length === 0 ? (
+            <p className="text-sm text-slate-500">Sin promesas registradas.</p>
+          ) : promiseAgenda.items.map((item) => (
+            <div key={`${item.member_id}-${item.promise_date}`} className="flex items-center justify-between rounded border border-slate-200 p-2 text-sm">
+              <span>{item.member_code} · {item.first_name} {item.last_name} · promesa {item.promise_date}</span>
+              <span className="font-semibold text-slate-900">${Number(item.overdue_total_amount || 0).toFixed(2)}</span>
             </div>
           ))}
         </div>
