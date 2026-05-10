@@ -124,6 +124,8 @@ export default function PosPage() {
     collectors_count: 0,
     total_recovered_amount: 0,
     total_commission_amount: 0,
+    avg_recovered_per_collector: 0,
+    commission_over_recovered_rate: 0,
     total_contacts_count: 0,
     top_collector_name: '',
     top_collector_recovered_amount: 0
@@ -313,6 +315,8 @@ export default function PosPage() {
         collectors_count: Number(collectorRankingData?.summary?.collectors_count ?? 0),
         total_recovered_amount: Number(collectorRankingData?.summary?.total_recovered_amount ?? 0),
         total_commission_amount: Number(collectorRankingData?.summary?.total_commission_amount ?? 0),
+        avg_recovered_per_collector: Number(collectorRankingData?.summary?.avg_recovered_per_collector ?? 0),
+        commission_over_recovered_rate: Number(collectorRankingData?.summary?.commission_over_recovered_rate ?? 0),
         total_contacts_count: Number(collectorRankingData?.summary?.total_contacts_count ?? 0),
         top_collector_name: String(collectorRankingData?.summary?.top_collector_name ?? ''),
         top_collector_recovered_amount: Number(collectorRankingData?.summary?.top_collector_recovered_amount ?? 0)
@@ -1097,7 +1101,7 @@ ${sale.notes ? `Nota: ${sale.notes}` : ''}
           <p className="mb-2 text-xs text-slate-500">
             Orden actual: {collectorSortMetricLabel} ({collectorSortDirectionLabel}).
           </p>
-          <div className="mb-2 grid gap-2 md:grid-cols-4">
+          <div className="mb-2 grid gap-2 md:grid-cols-6">
             <div className="rounded border border-slate-200 p-2">
               <p className="text-xs text-slate-500">Cobradores activos</p>
               <p className="text-lg font-semibold text-slate-900">{collectorRankingSummary.collectors_count}</p>
@@ -1109,6 +1113,14 @@ ${sale.notes ? `Nota: ${sale.notes}` : ''}
             <div className="rounded border border-amber-200 p-2">
               <p className="text-xs text-amber-700">Comisión estimada</p>
               <p className="text-lg font-semibold text-amber-700">${collectorRankingSummary.total_commission_amount.toFixed(2)}</p>
+            </div>
+            <div className="rounded border border-slate-200 p-2">
+              <p className="text-xs text-slate-500">Promedio por cobrador</p>
+              <p className="text-lg font-semibold text-slate-900">${collectorRankingSummary.avg_recovered_per_collector.toFixed(2)}</p>
+            </div>
+            <div className="rounded border border-slate-200 p-2">
+              <p className="text-xs text-slate-500">% comisión/recuperado</p>
+              <p className="text-lg font-semibold text-slate-900">{collectorRankingSummary.commission_over_recovered_rate.toFixed(2)}%</p>
             </div>
             <div className="rounded border border-slate-200 p-2">
               <p className="text-xs text-slate-500">{collectorLeadLabel}</p>

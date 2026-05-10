@@ -631,12 +631,15 @@ final class PosService
         $totalRecoveredAmount = 0.0;
         $totalCommissionAmount = 0.0;
         $totalContacts = 0;
+        $collectorsCount = count($items);
         foreach ($items as $item) {
             $totalRecoveredAmount += (float) ($item['recovered_amount'] ?? 0);
             $totalCommissionAmount += (float) ($item['commission_amount'] ?? 0);
             $totalContacts += (int) ($item['contacts_count'] ?? 0);
         }
         $topCollector = $items[0] ?? null;
+        $avgRecoveredPerCollector = $collectorsCount > 0 ? round($totalRecoveredAmount / $collectorsCount, 2) : 0.0;
+        $commissionOverRecoveredRate = $totalRecoveredAmount > 0 ? round(($totalCommissionAmount / $totalRecoveredAmount) * 100, 2) : 0.0;
 
         return [
             'date_from' => $dateFrom,
@@ -646,9 +649,11 @@ final class PosService
             'sort_dir' => $sortDir,
             'commission_rules' => $rules,
             'summary' => [
-                'collectors_count' => count($items),
+                'collectors_count' => $collectorsCount,
                 'total_recovered_amount' => round($totalRecoveredAmount, 2),
                 'total_commission_amount' => round($totalCommissionAmount, 2),
+                'avg_recovered_per_collector' => $avgRecoveredPerCollector,
+                'commission_over_recovered_rate' => $commissionOverRecoveredRate,
                 'total_contacts_count' => $totalContacts,
                 'top_collector_user_id' => (int) ($topCollector['user_id'] ?? 0),
                 'top_collector_name' => (string) ($topCollector['user_name'] ?? ''),
