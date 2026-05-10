@@ -63,6 +63,22 @@ final class PosService
         }
 
         $sale = $this->repo->findSaleById($tenantId, $gymId, $saleId);
+        return $this->buildSaleReceiptPayload($tenantId, $gymId, $sale);
+    }
+
+    public function getSaleReceiptByNumber(int $tenantId, int $gymId, string $receiptNumber): array
+    {
+        $normalized = strtoupper(trim($receiptNumber));
+        if ($normalized === '') {
+            throw new \InvalidArgumentException('receipt number is required');
+        }
+
+        $sale = $this->repo->findSaleByReceiptNumber($tenantId, $gymId, $normalized);
+        return $this->buildSaleReceiptPayload($tenantId, $gymId, $sale);
+    }
+
+    private function buildSaleReceiptPayload(int $tenantId, int $gymId, ?array $sale): array
+    {
         if (!$sale) {
             throw new \InvalidArgumentException('Sale not found');
         }
@@ -91,6 +107,7 @@ final class PosService
         return [
             'sale' => [
                 'id' => (int) $sale['id'],
+                'receipt_number' => (string) ($sale['receipt_number'] ?? ''),
                 'created_at' => (string) ($sale['created_at'] ?? ''),
                 'charge_mode' => (string) ($sale['charge_mode'] ?? ''),
                 'total_amount' => (float) ($sale['total_amount'] ?? 0),
@@ -215,6 +232,9 @@ final class PosService
                 'payment_id' => $paymentId,
                 'notes' => trim((string) ($input['notes'] ?? '')) ?: null
             ]);
+            $receiptSeq = $this->repo->reserveNextReceiptNumber($tenantId, $gymId);
+            $receiptNumber = $this->formatReceiptNumber($gymId, $receiptSeq);
+            $this->repo->setSaleReceiptNumber($tenantId, $gymId, $saleId, $receiptNumber);
 
             foreach ($normalizedItems as $item) {
                 $this->repo->createSaleItem([
@@ -270,6 +290,7 @@ final class PosService
             $conn->commit();
             return [
                 'sale_id' => $saleId,
+                'receipt_number' => $receiptNumber,
                 'payment_id' => $paymentId,
                 'member_account_charge_id' => $accountChargeId,
                 'total_amount' => $total,
@@ -581,5 +602,12 @@ final class PosService
             return $stored === '1' || strtolower($stored) === 'true';
         }
         return filter_var((string) Env::get('POS_REQUIRE_OPEN_CASH', '1'), FILTER_VALIDATE_BOOL);
+    }
+
+    private function formatReceiptNumber(int $gymId, int $sequence): string
+    {
+        $gymSegment = str_pad((string) max(0, $gymId), 3, '0', STR_PAD_LEFT);
+        $seqSegment = str_pad((string) max(1, $sequence), 8, '0', STR_PAD_LEFT);
+        return 'POS-' . $gymSegment . '-' . $seqSegment;
     }
 }

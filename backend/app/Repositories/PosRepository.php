@@ -9,7 +9,7 @@ final class PosRepository
     public function findSaleById(int $tenantId, int $gymId, int $saleId): ?array
     {
         $stmt = Database::connection()->prepare(
-            'SELECT s.id, s.created_at, s.charge_mode, s.total_amount, s.currency, s.notes, s.payment_id,
+            'SELECT s.id, s.gym_id, s.receipt_number, s.created_at, s.charge_mode, s.total_amount, s.currency, s.notes, s.payment_id,
                     m.member_code, m.first_name, m.last_name
              FROM pos_sales s
              LEFT JOIN members m ON m.id = s.member_id AND m.tenant_id = s.tenant_id AND m.gym_id = s.gym_id
@@ -21,6 +21,28 @@ final class PosRepository
         );
         $stmt->execute([
             'id' => $saleId,
+            'tenant_id' => $tenantId,
+            'gym_id' => $gymId
+        ]);
+        $row = $stmt->fetch();
+        return $row ?: null;
+    }
+
+    public function findSaleByReceiptNumber(int $tenantId, int $gymId, string $receiptNumber): ?array
+    {
+        $stmt = Database::connection()->prepare(
+            'SELECT s.id, s.gym_id, s.receipt_number, s.created_at, s.charge_mode, s.total_amount, s.currency, s.notes, s.payment_id,
+                    m.member_code, m.first_name, m.last_name
+             FROM pos_sales s
+             LEFT JOIN members m ON m.id = s.member_id AND m.tenant_id = s.tenant_id AND m.gym_id = s.gym_id
+             WHERE s.receipt_number = :receipt_number
+               AND s.tenant_id = :tenant_id
+               AND s.gym_id = :gym_id
+               AND s.deleted_at IS NULL
+             LIMIT 1'
+        );
+        $stmt->execute([
+            'receipt_number' => $receiptNumber,
             'tenant_id' => $tenantId,
             'gym_id' => $gymId
         ]);
@@ -498,7 +520,7 @@ final class PosRepository
         $total = (int) $countStmt->fetchColumn();
 
         $stmt = Database::connection()->prepare(
-            'SELECT s.id, s.member_id, s.total_amount, s.currency, s.charge_mode, s.payment_id, s.notes, s.created_at,
+            'SELECT s.id, s.member_id, s.total_amount, s.currency, s.charge_mode, s.payment_id, s.receipt_number, s.notes, s.created_at,
                     m.member_code, m.first_name, m.last_name
              FROM pos_sales s
              LEFT JOIN members m ON m.id = s.member_id
@@ -531,6 +553,62 @@ final class PosRepository
         );
         $stmt->execute($data);
         return (int) Database::connection()->lastInsertId();
+    }
+
+    public function reserveNextReceiptNumber(int $tenantId, int $gymId): int
+    {
+        $initStmt = Database::connection()->prepare(
+            'INSERT INTO pos_receipt_sequences (tenant_id, gym_id, next_number, created_at, updated_at)
+             VALUES (:tenant_id, :gym_id, 1, NOW(), NOW())
+             ON DUPLICATE KEY UPDATE updated_at = updated_at'
+        );
+        $initStmt->execute([
+            'tenant_id' => $tenantId,
+            'gym_id' => $gymId
+        ]);
+
+        $selectStmt = Database::connection()->prepare(
+            'SELECT next_number
+             FROM pos_receipt_sequences
+             WHERE tenant_id = :tenant_id AND gym_id = :gym_id
+             FOR UPDATE'
+        );
+        $selectStmt->execute([
+            'tenant_id' => $tenantId,
+            'gym_id' => $gymId
+        ]);
+        $current = (int) $selectStmt->fetchColumn();
+        if ($current <= 0) {
+            throw new \RuntimeException('Invalid receipt sequence state');
+        }
+
+        $updateStmt = Database::connection()->prepare(
+            'UPDATE pos_receipt_sequences
+             SET next_number = :next_number, updated_at = NOW()
+             WHERE tenant_id = :tenant_id AND gym_id = :gym_id'
+        );
+        $updateStmt->execute([
+            'next_number' => $current + 1,
+            'tenant_id' => $tenantId,
+            'gym_id' => $gymId
+        ]);
+
+        return $current;
+    }
+
+    public function setSaleReceiptNumber(int $tenantId, int $gymId, int $saleId, string $receiptNumber): void
+    {
+        $stmt = Database::connection()->prepare(
+            'UPDATE pos_sales
+             SET receipt_number = :receipt_number, updated_at = NOW()
+             WHERE id = :id AND tenant_id = :tenant_id AND gym_id = :gym_id'
+        );
+        $stmt->execute([
+            'receipt_number' => $receiptNumber,
+            'id' => $saleId,
+            'tenant_id' => $tenantId,
+            'gym_id' => $gymId
+        ]);
     }
 
     public function createSaleItem(array $data): void

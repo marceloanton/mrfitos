@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { adjustStock, closeCashSession, createPosProduct, createPosSale, getCashSessionReport, getOpenCashSessionSummary, getPosConfig, getPosSaleReceipt, getPosSummary, listCashSessions, listMemberAccountCharges, listPosProducts, listPosSales, listStockMovements, openCashSession, settleMemberAccountCharge, updatePosConfig } from '../services/posService';
+import { adjustStock, closeCashSession, createPosProduct, createPosSale, getCashSessionReport, getOpenCashSessionSummary, getPosConfig, getPosSaleReceipt, getPosSaleReceiptByNumber, getPosSummary, listCashSessions, listMemberAccountCharges, listPosProducts, listPosSales, listStockMovements, openCashSession, settleMemberAccountCharge, updatePosConfig } from '../services/posService';
 
 export default function PosPage() {
   const [requireOpenCash, setRequireOpenCash] = useState(true);
@@ -25,6 +25,7 @@ export default function PosPage() {
   const [cashSessions, setCashSessions] = useState([]);
   const [openingAmount, setOpeningAmount] = useState('');
   const [closingAmount, setClosingAmount] = useState('');
+  const [receiptNumber, setReceiptNumber] = useState('');
   const [summary, setSummary] = useState({
     today_sales_count: 0,
     today_sales_total: 0,
@@ -124,10 +125,10 @@ export default function PosPage() {
     setError('');
     try {
       const report = await getCashSessionReport(sessionId);
-      const openedAt = report?.session?.opened_at ?? '-';
-      const closedAt = report?.session?.closed_at ?? '-';
-      const methods = report?.payments_by_method ?? {};
-      const sales = report?.sales ?? {};
+      const openedAt = report?.cash_session?.opened_at ?? '-';
+      const closedAt = report?.cash_session?.closed_at ?? '-';
+      const methods = report?.payments?.by_method ?? {};
+      const sales = report?.pos_sales ?? {};
       const memberAccount = report?.member_account_settlements ?? {};
       const html = `
         <html>
@@ -147,11 +148,11 @@ export default function PosPage() {
             <div class="muted">Apertura: ${openedAt} | Cierre: ${closedAt}</div>
             <h2>Resumen de Caja</h2>
             <table>
-              <tr><th>Estado</th><td>${report?.session?.status ?? '-'}</td></tr>
-              <tr><th>Monto apertura</th><td>${report?.session?.opening_amount ?? 0}</td></tr>
-              <tr><th>Monto esperado</th><td>${report?.session?.expected_amount ?? 0}</td></tr>
-              <tr><th>Monto cierre</th><td>${report?.session?.closing_amount ?? 0}</td></tr>
-              <tr><th>Diferencia</th><td>${report?.session?.difference_amount ?? 0}</td></tr>
+              <tr><th>Estado</th><td>${report?.cash_session?.status ?? '-'}</td></tr>
+              <tr><th>Monto apertura</th><td>${report?.cash_session?.opening_amount ?? 0}</td></tr>
+              <tr><th>Monto esperado</th><td>${report?.cash_session?.expected_amount ?? 0}</td></tr>
+              <tr><th>Monto cierre</th><td>${report?.cash_session?.closing_amount ?? 0}</td></tr>
+              <tr><th>Diferencia</th><td>${report?.cash_session?.difference_amount ?? 0}</td></tr>
             </table>
             <h2>Cobros por método</h2>
             <table>
@@ -164,7 +165,7 @@ export default function PosPage() {
             <h2>Ventas POS</h2>
             <table>
               <tr><th>Cantidad ventas</th><td>${sales.count ?? 0}</td></tr>
-              <tr><th>Total vendido</th><td>${sales.total_amount ?? 0}</td></tr>
+              <tr><th>Total vendido</th><td>${sales.total ?? 0}</td></tr>
             </table>
             <h2>Cuenta socio liquidada</h2>
             <table>
@@ -188,7 +189,7 @@ export default function PosPage() {
     }
   };
 
-  const onPrintSaleTicket = async (saleId) => {
+  const onPrintSaleTicket = async (saleId, paper = '58') => {
     setError('');
     try {
       const receipt = await getPosSaleReceipt(saleId);
@@ -196,44 +197,38 @@ export default function PosPage() {
       const member = receipt?.member ?? null;
       const payment = receipt?.payment ?? null;
       const items = Array.isArray(receipt?.items) ? receipt.items : [];
-      const itemsRows = items.map((item) => `
-        <tr>
-          <td>${item.item_name ?? '-'}</td>
-          <td>${item.qty ?? 0}</td>
-          <td>${item.unit_price ?? 0}</td>
-          <td>${item.line_total ?? 0}</td>
-        </tr>
-      `).join('');
+      const line = '-'.repeat(paper === '80' ? 48 : 32);
+      const money = (value) => Number(value || 0).toFixed(2);
+      const qtyFmt = (value) => Number(value || 0).toFixed(2);
+      const itemLines = items.map((item) => {
+        const name = String(item.item_name ?? '-');
+        const qty = qtyFmt(item.qty);
+        const unit = money(item.unit_price);
+        const total = money(item.line_total);
+        return `${name}\n${qty} x ${unit} = ${total}`;
+      }).join('\n' + line + '\n');
       const html = `
         <html>
           <head>
-            <title>Ticket POS #${saleId}</title>
+            <title>Ticket POS ${sale.receipt_number ?? `#${saleId}`}</title>
             <style>
-              body { font-family: Arial, sans-serif; padding: 16px; color: #0f172a; }
-              h1 { margin: 0 0 6px 0; font-size: 20px; }
-              .muted { color: #475569; font-size: 12px; margin-bottom: 10px; }
-              table { border-collapse: collapse; width: 100%; margin-top: 8px; }
-              th, td { border: 1px solid #cbd5e1; padding: 6px; text-align: left; font-size: 12px; }
+              @page { size: ${paper}mm auto; margin: 4mm; }
+              body { font-family: "Courier New", monospace; font-size: ${paper === '80' ? '13px' : '12px'}; color: #111; white-space: pre-wrap; }
             </style>
           </head>
           <body>
-            <h1>MRAnalytics POS</h1>
-            <div class="muted">Ticket venta #${sale.id ?? saleId} | ${sale.created_at ?? '-'}</div>
-            <div class="muted">Socio: ${member ? `${member.member_code ?? ''} ${member.first_name ?? ''} ${member.last_name ?? ''}` : 'Consumidor final'}</div>
-            <table>
-              <thead>
-                <tr><th>Item</th><th>Cant.</th><th>Precio</th><th>Total</th></tr>
-              </thead>
-              <tbody>
-                ${itemsRows || '<tr><td colspan="4">Sin items</td></tr>'}
-              </tbody>
-            </table>
-            <table>
-              <tr><th>Modo cobro</th><td>${sale.charge_mode ?? '-'}</td></tr>
-              <tr><th>Total</th><td>${sale.total_amount ?? 0} ${sale.currency ?? ''}</td></tr>
-              <tr><th>Pago</th><td>${payment ? `${payment.method ?? '-'} (${payment.amount ?? 0})` : 'Pendiente / cuenta socio'}</td></tr>
-              <tr><th>Notas</th><td>${sale.notes ?? '-'}</td></tr>
-            </table>
+MRFitOS / MRAnalytics
+${sale.receipt_number ?? `POS-${sale.id ?? saleId}`}
+Fecha: ${sale.created_at ?? '-'}
+${line}
+Cliente: ${member ? `${member.member_code ?? ''} ${member.first_name ?? ''} ${member.last_name ?? ''}` : 'Consumidor final'}
+${line}
+${itemLines || 'Sin items'}
+${line}
+Modo: ${sale.charge_mode ?? '-'}
+Pago: ${payment ? `${payment.method ?? '-'} ${money(payment.amount)}` : 'Pendiente / cuenta socio'}
+TOTAL: ${money(sale.total_amount)} ${sale.currency ?? ''}
+${sale.notes ? `Nota: ${sale.notes}` : ''}
           </body>
         </html>
       `;
@@ -248,6 +243,26 @@ export default function PosPage() {
       w.print();
     } catch (err) {
       setError(err?.response?.data?.message ?? 'No se pudo generar el ticket de venta.');
+    }
+  };
+
+  const onReprintByReceiptNumber = async (paper = '58') => {
+    const number = receiptNumber.trim();
+    if (!number) {
+      setError('Ingresá un número de comprobante.');
+      return;
+    }
+    setError('');
+    try {
+      const receipt = await getPosSaleReceiptByNumber(number);
+      const saleId = receipt?.sale?.id;
+      if (!saleId) {
+        setError('Comprobante no encontrado.');
+        return;
+      }
+      await onPrintSaleTicket(saleId, paper);
+    } catch (err) {
+      setError(err?.response?.data?.message ?? 'No se pudo reimprimir el comprobante.');
     }
   };
 
@@ -521,15 +536,34 @@ export default function PosPage() {
 
       <div className="rounded-xl bg-white p-4 shadow-sm">
         <h3 className="mb-2 text-lg font-semibold text-slate-900">Últimas ventas POS</h3>
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <input
+            className="rounded border border-slate-300 p-2 text-sm"
+            placeholder="N° comprobante (ej: POS-001-00000025)"
+            value={receiptNumber}
+            onChange={(e) => setReceiptNumber(e.target.value)}
+          />
+          <button className="rounded border border-slate-300 px-2 py-1 text-sm" onClick={() => onReprintByReceiptNumber('58')}>
+            Reimprimir 58mm
+          </button>
+          <button className="rounded border border-slate-300 px-2 py-1 text-sm" onClick={() => onReprintByReceiptNumber('80')}>
+            Reimprimir 80mm
+          </button>
+        </div>
         <div className="space-y-2">
           {sales.length === 0 ? (
             <p className="text-sm text-slate-500">Sin ventas.</p>
           ) : sales.map((s) => (
             <div key={s.id} className="flex items-center justify-between gap-2 rounded border border-slate-200 p-2 text-sm">
               <span>#{s.id} · {s.total_amount} {s.currency} · {s.charge_mode} · {s.member_code ? `${s.member_code} ${s.first_name} ${s.last_name}` : 'sin socio'}</span>
-              <button className="rounded border border-slate-300 px-2 py-1" onClick={() => onPrintSaleTicket(s.id)}>
-                Imprimir ticket
-              </button>
+              <div className="flex gap-1">
+                <button className="rounded border border-slate-300 px-2 py-1" onClick={() => onPrintSaleTicket(s.id, '58')}>
+                  Ticket 58mm
+                </button>
+                <button className="rounded border border-slate-300 px-2 py-1" onClick={() => onPrintSaleTicket(s.id, '80')}>
+                  Ticket 80mm
+                </button>
+              </div>
             </div>
           ))}
         </div>

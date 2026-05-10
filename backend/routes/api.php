@@ -117,6 +117,7 @@ $router->add('GET', '/pos/config', [PosController::class, 'config'], [AuthMiddle
 $router->add('POST', '/pos/config', [PosController::class, 'updateConfig'], [AuthMiddleware::class, TenantMiddleware::class, new PermissionMiddleware('payments.write')]);
 $router->add('POST', '/pos/products', [PosController::class, 'createProduct'], [AuthMiddleware::class, TenantMiddleware::class, new PermissionMiddleware('payments.write')]);
 $router->add('GET', '/pos/sales', [PosController::class, 'sales'], [AuthMiddleware::class, TenantMiddleware::class, new PermissionMiddleware('payments.read')]);
+$router->add('GET', '/pos/sales/receipt', [PosController::class, 'saleReceiptByNumber'], [AuthMiddleware::class, TenantMiddleware::class, new PermissionMiddleware('payments.read')]);
 $router->add('GET', '/pos/sales/{id}/receipt', [PosController::class, 'saleReceipt'], [AuthMiddleware::class, TenantMiddleware::class, new PermissionMiddleware('payments.read')]);
 $router->add('POST', '/pos/sales', [PosController::class, 'createSale'], [AuthMiddleware::class, TenantMiddleware::class, new PermissionMiddleware('payments.write')]);
 $router->add('GET', '/pos/member-account/charges', [PosController::class, 'memberAccountCharges'], [AuthMiddleware::class, TenantMiddleware::class, new PermissionMiddleware('payments.read')]);

@@ -19,6 +19,11 @@ export async function getPosSaleReceipt(id) {
   return payload(data);
 }
 
+export async function getPosSaleReceiptByNumber(number) {
+  const { data } = await api.get('/pos/sales/receipt', { params: { number } });
+  return payload(data);
+}
+
 export async function getPosConfig() {
   const { data } = await api.get('/pos/config');
   return payload(data);
