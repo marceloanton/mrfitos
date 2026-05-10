@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { adjustStock, closeCashSession, createPosAlertContact, createPosProduct, createPosSale, deletePosAlertContact, exportPosAuditCsv, exportPosZCloseCsv, getCashByOperatorReport, getCashSessionReport, getOpenCashSessionSummary, getPosAlertNotifyLink, getPosAlerts, getPosConfig, getPosSaleReceipt, getPosSaleReceiptByNumber, getPosSummary, getPosZCloseReport, listCashSessions, listLowStockProducts, listMemberAccountCharges, listPosAlertContacts, listPosAudit, listPosProducts, listPosSales, listStockMovements, openCashSession, settleMemberAccountCharge, updatePosAlertContact, updatePosConfig, voidPosSale } from '../services/posService';
+import { adjustStock, closeCashSession, createPosAlertContact, createPosProduct, createPosSale, deletePosAlertContact, exportPosAuditCsv, exportPosZCloseCsv, getCashByOperatorReport, getCashSessionReport, getOpenCashSessionSummary, getPosAlertNotifyLink, getPosAlerts, getPosConfig, getPosSaleReceipt, getPosSaleReceiptByNumber, getPosSummary, getPosZCloseReport, listCashSessions, listLowStockProducts, listMemberAccountCharges, listPosAlertContacts, listPosAudit, listPosProducts, listPosSales, listStockMovements, notifyCriticalPosAlert, openCashSession, settleMemberAccountCharge, updatePosAlertContact, updatePosConfig, voidPosSale } from '../services/posService';
 import { useAuthStore } from '../stores/authStore';
 
 export default function PosPage() {
@@ -456,6 +456,30 @@ ${sale.notes ? `Nota: ${sale.notes}` : ''}
       }
     } catch (err) {
       setError(err?.response?.data?.message ?? 'No se pudo generar notificación WhatsApp.');
+    }
+  };
+
+  const onDispatchCriticalAlert = async () => {
+    setError('');
+    setMessage('');
+    try {
+      const data = await notifyCriticalPosAlert({
+        date_from: alertFilters.date_from || undefined,
+        date_to: alertFilters.date_to || undefined,
+        difference_threshold: Number(alertFilters.difference_threshold || 0),
+        voids_threshold: Number(alertFilters.voids_threshold || 3),
+        contact_id: selectedAlertContactId ? Number(selectedAlertContactId) : undefined
+      });
+      if (data?.dispatched) {
+        setMessage('Alerta crítica registrada y link de WhatsApp generado.');
+        if (data?.whatsapp_link) {
+          window.open(data.whatsapp_link, '_blank', 'noopener,noreferrer');
+        }
+      } else {
+        setMessage(`Dispatch no ejecutado: ${data?.reason ?? 'sin motivo'}.`);
+      }
+    } catch (err) {
+      setError(err?.response?.data?.message ?? 'No se pudo ejecutar el dispatch crítico.');
     }
   };
 
@@ -928,6 +952,9 @@ ${sale.notes ? `Nota: ${sale.notes}` : ''}
             </button>
             <button className="rounded border border-slate-300 px-2 py-1 text-sm disabled:opacity-50" disabled={!canReportRead} onClick={onNotifyAlertsWhatsapp}>
               Notificar WhatsApp
+            </button>
+            <button className="rounded border border-rose-300 px-2 py-1 text-sm text-rose-700 disabled:opacity-50" disabled={!canReportRead} onClick={onDispatchCriticalAlert}>
+              Enviar crítica ahora
             </button>
           </div>
         </div>

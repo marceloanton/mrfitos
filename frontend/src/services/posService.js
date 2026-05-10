@@ -128,6 +128,11 @@ export async function getPosAlertNotifyLink(params = {}) {
   return payload(data);
 }
 
+export async function notifyCriticalPosAlert(body = {}) {
+  const { data } = await api.post('/pos/alerts/notify-critical', body);
+  return payload(data);
+}
+
 export async function listPosAlertContacts() {
   const { data } = await api.get('/pos/alerts/contacts');
   return payload(data);

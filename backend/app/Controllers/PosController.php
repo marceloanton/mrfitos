@@ -370,6 +370,24 @@ final class PosController
         }
     }
 
+    public function notifyCriticalAlert(): void
+    {
+        $auth = json_decode($_SERVER['auth_user'] ?? '{}', true) ?: [];
+        try {
+            $data = $this->service->notifyCriticalOperationalAlerts(
+                (int) ($auth['tenant_id'] ?? 0),
+                (int) ($auth['gym_id'] ?? 0),
+                (int) ($auth['sub'] ?? 0),
+                Request::json()
+            );
+            Response::json(['success' => true, 'data' => $data]);
+        } catch (\InvalidArgumentException $e) {
+            Response::json(['success' => false, 'message' => $e->getMessage()], 422);
+        } catch (\Throwable $e) {
+            Response::json(['success' => false, 'message' => 'Failed to dispatch POS critical alert'], 500);
+        }
+    }
+
     public function alertContacts(): void
     {
         $auth = json_decode($_SERVER['auth_user'] ?? '{}', true) ?: [];

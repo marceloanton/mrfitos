@@ -1397,4 +1397,24 @@ final class PosRepository
         ]);
         return $stmt->rowCount() > 0;
     }
+
+    public function findLatestActivityByAction(int $tenantId, int $gymId, string $action): ?array
+    {
+        $stmt = Database::connection()->prepare(
+            'SELECT id, tenant_id, gym_id, user_id, entity_type, entity_id, action, metadata, created_at
+             FROM activity_logs
+             WHERE tenant_id = :tenant_id
+               AND gym_id = :gym_id
+               AND action = :action
+             ORDER BY id DESC
+             LIMIT 1'
+        );
+        $stmt->execute([
+            'tenant_id' => $tenantId,
+            'gym_id' => $gymId,
+            'action' => $action,
+        ]);
+        $row = $stmt->fetch();
+        return $row ?: null;
+    }
 }

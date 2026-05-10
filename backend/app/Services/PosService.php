@@ -835,6 +835,116 @@ final class PosService
         ];
     }
 
+    public function notifyCriticalOperationalAlerts(
+        int $tenantId,
+        int $gymId,
+        int $userId,
+        array $input
+    ): array {
+        $dateFrom = $input['date_from'] ?? null;
+        $dateTo = $input['date_to'] ?? null;
+        $differenceThreshold = $input['difference_threshold'] ?? null;
+        $voidsThreshold = $input['voids_threshold'] ?? null;
+        $phone = $input['phone'] ?? null;
+        $contactId = $input['contact_id'] ?? null;
+        $cooldownMinutes = $this->resolveCooldownMinutes($input['cooldown_minutes'] ?? null);
+
+        $notifyData = $this->getOperationalAlertsNotifyLink(
+            $tenantId,
+            $gymId,
+            $dateFrom,
+            $dateTo,
+            $differenceThreshold,
+            $voidsThreshold,
+            $phone,
+            $contactId
+        );
+
+        $level = (string) ($notifyData['level'] ?? 'ok');
+        if ($level !== 'critical') {
+            return [
+                'dispatched' => false,
+                'reason' => 'not_critical',
+                'level' => $level,
+                'message' => (string) ($notifyData['message'] ?? ''),
+                'cooldown_minutes' => $cooldownMinutes,
+            ];
+        }
+
+        $whatsappLink = $notifyData['whatsapp_link'] ?? null;
+        if (!is_string($whatsappLink) || trim($whatsappLink) === '') {
+            return [
+                'dispatched' => false,
+                'reason' => 'no_target',
+                'level' => $level,
+                'message' => (string) ($notifyData['message'] ?? ''),
+                'target_source' => (string) ($notifyData['target_source'] ?? 'none'),
+                'target_label' => $notifyData['target_label'] ?? null,
+                'cooldown_minutes' => $cooldownMinutes,
+            ];
+        }
+
+        $lastDispatch = $this->repo->findLatestActivityByAction($tenantId, $gymId, 'pos_alert_critical_notified');
+        if ($lastDispatch) {
+            $lastCreatedAt = (string) ($lastDispatch['created_at'] ?? '');
+            $lastTs = strtotime($lastCreatedAt);
+            if ($lastTs !== false) {
+                $cooldownUntilTs = $lastTs + ($cooldownMinutes * 60);
+                if (time() < $cooldownUntilTs) {
+                    return [
+                        'dispatched' => false,
+                        'reason' => 'cooldown',
+                        'level' => $level,
+                        'message' => (string) ($notifyData['message'] ?? ''),
+                        'cooldown_minutes' => $cooldownMinutes,
+                        'cooldown_until' => date('Y-m-d H:i:s', $cooldownUntilTs),
+                        'last_dispatched_at' => $lastCreatedAt,
+                        'target_source' => (string) ($notifyData['target_source'] ?? 'none'),
+                        'target_label' => $notifyData['target_label'] ?? null,
+                    ];
+                }
+            }
+        }
+
+        $this->activity->create([
+            'tenant_id' => $tenantId,
+            'gym_id' => $gymId,
+            'user_id' => $userId > 0 ? $userId : null,
+            'entity_type' => 'pos_alert',
+            'entity_id' => null,
+            'action' => 'pos_alert_critical_notified',
+            'metadata' => [
+                'level' => $level,
+                'message' => (string) ($notifyData['message'] ?? ''),
+                'target_source' => (string) ($notifyData['target_source'] ?? 'none'),
+                'target_label' => $notifyData['target_label'] ?? null,
+                'phone_normalized' => $notifyData['phone_normalized'] ?? null,
+                'whatsapp_link' => $whatsappLink,
+                'cooldown_minutes' => $cooldownMinutes,
+                'filters' => [
+                    'date_from' => $dateFrom,
+                    'date_to' => $dateTo,
+                    'difference_threshold' => $differenceThreshold,
+                    'voids_threshold' => $voidsThreshold,
+                    'contact_id' => $contactId,
+                ],
+            ],
+            'ip_address' => $_SERVER['REMOTE_ADDR'] ?? null,
+            'user_agent' => $_SERVER['HTTP_USER_AGENT'] ?? null,
+        ]);
+
+        return [
+            'dispatched' => true,
+            'level' => $level,
+            'message' => (string) ($notifyData['message'] ?? ''),
+            'whatsapp_link' => $whatsappLink,
+            'target_source' => (string) ($notifyData['target_source'] ?? 'none'),
+            'target_label' => $notifyData['target_label'] ?? null,
+            'phone_normalized' => $notifyData['phone_normalized'] ?? null,
+            'cooldown_minutes' => $cooldownMinutes,
+        ];
+    }
+
     public function listAlertContacts(int $tenantId, int $gymId): array
     {
         $rows = $this->repo->listAlertContacts($tenantId, $gymId);
@@ -1351,5 +1461,20 @@ final class PosService
             return null;
         }
         return $digits;
+    }
+
+    private function resolveCooldownMinutes(mixed $value): int
+    {
+        if ($value === null || $value === '') {
+            return 60;
+        }
+        if (!is_numeric($value)) {
+            throw new \InvalidArgumentException('cooldown_minutes must be numeric');
+        }
+        $minutes = (int) $value;
+        if ($minutes < 1 || $minutes > 1440) {
+            throw new \InvalidArgumentException('cooldown_minutes must be between 1 and 1440');
+        }
+        return $minutes;
     }
 }
