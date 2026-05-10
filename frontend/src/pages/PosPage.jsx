@@ -116,6 +116,7 @@ export default function PosPage() {
     items: []
   });
   const [collectorRanking, setCollectorRanking] = useState([]);
+  const [collectorRankingLimit, setCollectorRankingLimit] = useState('25');
   const [collectorCommissionRules, setCollectorCommissionRules] = useState(null);
   const [summary, setSummary] = useState({
     today_sales_count: 0,
@@ -214,7 +215,8 @@ export default function PosPage() {
         }),
         getMemberAccountCollectorRanking({
           date_from: followupDateFrom || undefined,
-          date_to: followupDateTo || undefined
+          date_to: followupDateTo || undefined,
+          limit: Number(collectorRankingLimit || 25)
         })
       ]);
       setSales(Array.isArray(salesData?.items) ? salesData.items : []);
@@ -912,7 +914,8 @@ ${sale.notes ? `Nota: ${sale.notes}` : ''}
     try {
       const blob = await exportMemberAccountCollectorRankingCsv({
         date_from: followupDateFrom || undefined,
-        date_to: followupDateTo || undefined
+        date_to: followupDateTo || undefined,
+        limit: Number(collectorRankingLimit || 25)
       });
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -976,6 +979,11 @@ ${sale.notes ? `Nota: ${sale.notes}` : ''}
         <div className="mb-3 flex flex-wrap items-end gap-2">
           <input className="rounded border border-slate-300 p-2 text-sm" type="date" value={followupDateFrom} onChange={(e) => setFollowupDateFrom(e.target.value)} />
           <input className="rounded border border-slate-300 p-2 text-sm" type="date" value={followupDateTo} onChange={(e) => setFollowupDateTo(e.target.value)} />
+          <select className="rounded border border-slate-300 p-2 text-sm" value={collectorRankingLimit} onChange={(e) => setCollectorRankingLimit(e.target.value)}>
+            <option value="10">Top 10</option>
+            <option value="25">Top 25</option>
+            <option value="50">Top 50</option>
+          </select>
           <button className="rounded border border-slate-300 px-2 py-2 text-xs" onClick={() => applyFollowupRangePreset(7)}>
             7d
           </button>

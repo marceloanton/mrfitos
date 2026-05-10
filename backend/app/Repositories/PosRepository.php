@@ -2075,7 +2075,7 @@ final class PosRepository
         return $stmt->fetch() ?: [];
     }
 
-    public function getMemberAccountCollectorRanking(int $tenantId, int $gymId, string $dateFrom, string $dateTo): array
+    public function getMemberAccountCollectorRanking(int $tenantId, int $gymId, string $dateFrom, string $dateTo, int $limit): array
     {
         $from = $dateFrom . ' 00:00:00';
         $to = $dateTo . ' 23:59:59';
@@ -2105,6 +2105,7 @@ final class PosRepository
             'from_dt' => $from,
             'to_dt' => $to,
         ]);
-        return $stmt->fetchAll() ?: [];
+        $rows = $stmt->fetchAll() ?: [];
+        return array_slice($rows, 0, max(1, $limit));
     }
 }

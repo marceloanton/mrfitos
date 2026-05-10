@@ -554,10 +554,17 @@ final class PosService
         ];
     }
 
-    public function getMemberAccountCollectorRanking(int $tenantId, int $gymId, mixed $dateFromInput, mixed $dateToInput): array
+    public function getMemberAccountCollectorRanking(int $tenantId, int $gymId, mixed $dateFromInput, mixed $dateToInput, mixed $limitInput = null): array
     {
         $dateFrom = $this->resolveOptionalDate($dateFromInput, 'date_from');
         $dateTo = $this->resolveOptionalDate($dateToInput, 'date_to');
+        $limit = is_numeric($limitInput) ? (int) $limitInput : 25;
+        if ($limit < 1) {
+            $limit = 25;
+        }
+        if ($limit > 100) {
+            $limit = 100;
+        }
         if ($dateFrom === null && $dateTo === null) {
             $dateTo = date('Y-m-d');
             $dateFrom = date('Y-m-d', strtotime('-6 days'));
@@ -575,7 +582,7 @@ final class PosService
         }
 
         $rules = $this->resolveCollectorCommissionRules();
-        $rows = $this->repo->getMemberAccountCollectorRanking($tenantId, $gymId, $dateFrom, $dateTo);
+        $rows = $this->repo->getMemberAccountCollectorRanking($tenantId, $gymId, $dateFrom, $dateTo, $limit);
         $items = array_map(function (array $row) use ($rules): array {
             $contacts = (int) ($row['contacts_count'] ?? 0);
             $responses = (int) ($row['responses_count'] ?? 0);
@@ -598,6 +605,7 @@ final class PosService
         return [
             'date_from' => $dateFrom,
             'date_to' => $dateTo,
+            'limit' => $limit,
             'commission_rules' => $rules,
             'items' => $items,
         ];

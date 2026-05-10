@@ -345,12 +345,14 @@ final class PosController
         $auth = json_decode($_SERVER['auth_user'] ?? '{}', true) ?: [];
         $dateFrom = Request::query('date_from', null);
         $dateTo = Request::query('date_to', null);
+        $limit = Request::query('limit', null);
         try {
             $data = $this->service->getMemberAccountCollectorRanking(
                 (int) ($auth['tenant_id'] ?? 0),
                 (int) ($auth['gym_id'] ?? 0),
                 $dateFrom,
-                $dateTo
+                $dateTo,
+                $limit
             );
             Response::json(['success' => true, 'data' => $data]);
         } catch (\InvalidArgumentException $e) {
@@ -365,10 +367,11 @@ final class PosController
         $auth = json_decode($_SERVER['auth_user'] ?? '{}', true) ?: [];
         $dateFrom = Request::query('date_from', null);
         $dateTo = Request::query('date_to', null);
+        $limit = Request::query('limit', null);
         try {
             $tenantId = (int) ($auth['tenant_id'] ?? 0);
             $gymId = (int) ($auth['gym_id'] ?? 0);
-            $data = $this->service->getMemberAccountCollectorRanking($tenantId, $gymId, $dateFrom, $dateTo);
+            $data = $this->service->getMemberAccountCollectorRanking($tenantId, $gymId, $dateFrom, $dateTo, $limit);
             $this->emitMemberAccountCollectorRankingCsv($tenantId, $gymId, $data);
         } catch (\InvalidArgumentException $e) {
             Response::json(['success' => false, 'message' => $e->getMessage()], 422);
@@ -1384,6 +1387,7 @@ final class PosController
         fputcsv($out, ['metadata', 'gym_id', (string) $gymId]);
         fputcsv($out, ['metadata', 'date_from', $dateFrom]);
         fputcsv($out, ['metadata', 'date_to', $dateTo]);
+        fputcsv($out, ['metadata', 'limit', $this->normalizeCsvValue($data['limit'] ?? null)]);
         fputcsv($out, ['', '', '']);
 
         $this->writeSectionRows($out, 'totals', [
