@@ -388,6 +388,56 @@ final class PosController
         }
     }
 
+    public function dispatchCriticalAlertsCron(): void
+    {
+        try {
+            $input = Request::json();
+            if (!is_array($input)) {
+                $input = [];
+            }
+
+            $tenantId = isset($input['tenant_id']) ? (int) $input['tenant_id'] : 0;
+            $gymId = isset($input['gym_id']) ? (int) $input['gym_id'] : 0;
+            $usedFallback = false;
+
+            if ($tenantId <= 0 || $gymId <= 0) {
+                $tenantId = 1;
+                $gymId = 1;
+                $usedFallback = true;
+            }
+
+            $data = $this->service->notifyCriticalOperationalAlerts($tenantId, $gymId, 0, $input);
+
+            $response = [
+                'tenant_id' => $tenantId,
+                'gym_id' => $gymId,
+                'dispatched' => (bool) ($data['dispatched'] ?? false),
+            ];
+
+            if (isset($data['reason'])) {
+                $response['reason'] = (string) $data['reason'];
+            }
+            if (isset($data['level'])) {
+                $response['level'] = (string) $data['level'];
+            }
+            if (isset($data['whatsapp_link']) && is_string($data['whatsapp_link']) && trim($data['whatsapp_link']) !== '') {
+                $response['whatsapp_link'] = $data['whatsapp_link'];
+            }
+            if (isset($data['cooldown_until']) && is_string($data['cooldown_until']) && trim($data['cooldown_until']) !== '') {
+                $response['cooldown_until'] = $data['cooldown_until'];
+            }
+            if ($usedFallback) {
+                $response['note'] = 'MVP fallback applied: tenant_id=1 and gym_id=1. Future cron should iterate all tenant/gym scopes.';
+            }
+
+            Response::json(['success' => true, 'data' => $response]);
+        } catch (\InvalidArgumentException $e) {
+            Response::json(['success' => false, 'message' => $e->getMessage()], 422);
+        } catch (\Throwable $e) {
+            Response::json(['success' => false, 'message' => 'Failed to dispatch POS critical alerts by cron'], 500);
+        }
+    }
+
     public function alertContacts(): void
     {
         $auth = json_decode($_SERVER['auth_user'] ?? '{}', true) ?: [];
