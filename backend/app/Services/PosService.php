@@ -1297,6 +1297,13 @@ final class PosService
         return $rows;
     }
 
+    public function listPosAlertCronHistory(int $tenantId, int $gymId, int $page, int $perPage): array
+    {
+        $rows = $this->repo->listPosAlertCronHistory($tenantId, $gymId, $page, $perPage);
+        $rows['items'] = array_map([$this, 'normalizeCronHistoryItem'], $rows['items'] ?? []);
+        return $rows;
+    }
+
     public function exportCriticalAlertDispatchHistory(
         int $tenantId,
         int $gymId,
@@ -1324,6 +1331,21 @@ final class PosService
             'tenant_id' => (int) ($row['tenant_id'] ?? 0),
             'gym_id' => (int) ($row['gym_id'] ?? 0),
         ], $rows), static fn (array $scope): bool => $scope['tenant_id'] > 0 && $scope['gym_id'] > 0));
+    }
+
+    public function logPosAlertCriticalCronRun(int $tenantId, ?int $gymId, array $metadata): void
+    {
+        $this->activity->create([
+            'tenant_id' => $tenantId,
+            'gym_id' => $gymId,
+            'user_id' => null,
+            'entity_type' => 'pos_alert',
+            'entity_id' => null,
+            'action' => 'pos_alert_critical_cron_run',
+            'metadata' => $metadata,
+            'ip_address' => $_SERVER['REMOTE_ADDR'] ?? null,
+            'user_agent' => $_SERVER['HTTP_USER_AGENT'] ?? null,
+        ]);
     }
 
     private function getRequireOpenCash(int $tenantId, int $gymId): bool
@@ -1580,6 +1602,55 @@ final class PosService
             'target_source' => isset($metadata['target_source']) ? (string) $metadata['target_source'] : null,
             'target_label' => isset($metadata['target_label']) ? (string) $metadata['target_label'] : null,
             'whatsapp_link' => isset($metadata['whatsapp_link']) ? (string) $metadata['whatsapp_link'] : null,
+        ];
+    }
+
+    private function normalizeCronHistoryItem(array $row): array
+    {
+        $metadata = [];
+        $raw = $row['metadata'] ?? null;
+        if (is_string($raw) && $raw !== '') {
+            $decoded = json_decode($raw, true);
+            if (is_array($decoded)) {
+                $metadata = $decoded;
+            }
+        }
+
+        $action = (string) ($row['action'] ?? '');
+        if ($action === 'pos_alert_critical_cron_run') {
+            $mode = (string) ($metadata['mode'] ?? 'bulk');
+            $scope = null;
+            if ($mode === 'single') {
+                $scope = [
+                    'tenant_id' => isset($metadata['tenant_id']) ? (int) $metadata['tenant_id'] : (int) ($row['tenant_id'] ?? 0),
+                    'gym_id' => isset($metadata['gym_id']) ? (int) $metadata['gym_id'] : (isset($row['gym_id']) ? (int) $row['gym_id'] : null),
+                ];
+            }
+
+            return [
+                'id' => (int) ($row['id'] ?? 0),
+                'created_at' => (string) ($row['created_at'] ?? ''),
+                'mode' => $mode,
+                'processed' => (int) ($metadata['processed'] ?? 0),
+                'dispatched' => (int) ($metadata['dispatched'] ?? 0),
+                'skipped' => (int) ($metadata['skipped'] ?? 0),
+                'scope' => $scope,
+                'action' => $action,
+            ];
+        }
+
+        return [
+            'id' => (int) ($row['id'] ?? 0),
+            'created_at' => (string) ($row['created_at'] ?? ''),
+            'mode' => 'dispatch',
+            'processed' => 1,
+            'dispatched' => 1,
+            'skipped' => 0,
+            'scope' => [
+                'tenant_id' => isset($row['tenant_id']) ? (int) $row['tenant_id'] : null,
+                'gym_id' => isset($row['gym_id']) ? (int) $row['gym_id'] : null,
+            ],
+            'action' => $action,
         ];
     }
 

@@ -385,6 +385,27 @@ final class PosController
         }
     }
 
+    public function cronHistory(): void
+    {
+        $auth = json_decode($_SERVER['auth_user'] ?? '{}', true) ?: [];
+        $page = max(1, (int) Request::query('page', 1));
+        $perPage = min(100, max(1, (int) Request::query('per_page', 20)));
+
+        try {
+            $data = $this->service->listPosAlertCronHistory(
+                (int) ($auth['tenant_id'] ?? 0),
+                (int) ($auth['gym_id'] ?? 0),
+                $page,
+                $perPage
+            );
+            Response::json(['success' => true, 'data' => $data]);
+        } catch (\InvalidArgumentException $e) {
+            Response::json(['success' => false, 'message' => $e->getMessage()], 422);
+        } catch (\Throwable $e) {
+            Response::json(['success' => false, 'message' => 'Failed to fetch POS alert cron history'], 500);
+        }
+    }
+
     public function dispatchHistoryExport(): void
     {
         $auth = json_decode($_SERVER['auth_user'] ?? '{}', true) ?: [];
@@ -473,6 +494,15 @@ final class PosController
                     $item['level'] = (string) $data['level'];
                 }
 
+                $this->service->logPosAlertCriticalCronRun($tenantId, $gymId, [
+                    'mode' => 'single',
+                    'processed' => 1,
+                    'dispatched' => $item['dispatched'] ? 1 : 0,
+                    'skipped' => $item['dispatched'] ? 0 : 1,
+                    'tenant_id' => $tenantId,
+                    'gym_id' => $gymId,
+                ]);
+
                 Response::json([
                     'success' => true,
                     'data' => [
@@ -490,6 +520,7 @@ final class PosController
             $items = [];
             $dispatchedCount = 0;
             $skippedCount = 0;
+            $perTenantSummary = [];
 
             foreach ($scopes as $scope) {
                 $scopeTenantId = (int) ($scope['tenant_id'] ?? 0);
@@ -517,6 +548,34 @@ final class PosController
                 } else {
                     $skippedCount++;
                 }
+
+                if (!isset($perTenantSummary[$scopeTenantId])) {
+                    $perTenantSummary[$scopeTenantId] = [
+                        'processed' => 0,
+                        'dispatched' => 0,
+                        'skipped' => 0,
+                        'scope_gym_ids' => [],
+                    ];
+                }
+                $perTenantSummary[$scopeTenantId]['processed']++;
+                if ($wasDispatched) {
+                    $perTenantSummary[$scopeTenantId]['dispatched']++;
+                } else {
+                    $perTenantSummary[$scopeTenantId]['skipped']++;
+                }
+                $perTenantSummary[$scopeTenantId]['scope_gym_ids'][(string) $scopeGymId] = $scopeGymId;
+            }
+
+            foreach ($perTenantSummary as $summaryTenantId => $summary) {
+                $scopeGymIds = array_values($summary['scope_gym_ids']);
+                sort($scopeGymIds);
+                $this->service->logPosAlertCriticalCronRun((int) $summaryTenantId, null, [
+                    'mode' => 'bulk',
+                    'processed' => (int) $summary['processed'],
+                    'dispatched' => (int) $summary['dispatched'],
+                    'skipped' => (int) $summary['skipped'],
+                    'scope_gym_ids' => $scopeGymIds,
+                ]);
             }
 
             Response::json([

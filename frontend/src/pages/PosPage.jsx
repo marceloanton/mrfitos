@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { adjustStock, closeCashSession, createPosAlertContact, createPosProduct, createPosSale, deletePosAlertContact, exportPosAlertDispatchHistoryCsv, exportPosAuditCsv, exportPosZCloseCsv, getCashByOperatorReport, getCashSessionReport, getOpenCashSessionSummary, getPosAlertNotifyLink, getPosAlerts, getPosAlertsStatus, getPosConfig, getPosSaleReceipt, getPosSaleReceiptByNumber, getPosSummary, getPosZCloseReport, listCashSessions, listLowStockProducts, listMemberAccountCharges, listPosAlertContacts, listPosAlertDispatchHistory, listPosAudit, listPosProducts, listPosSales, listStockMovements, notifyCriticalPosAlert, openCashSession, settleMemberAccountCharge, updatePosAlertContact, updatePosConfig, voidPosSale } from '../services/posService';
+import { adjustStock, closeCashSession, createPosAlertContact, createPosProduct, createPosSale, deletePosAlertContact, exportPosAlertDispatchHistoryCsv, exportPosAuditCsv, exportPosZCloseCsv, getCashByOperatorReport, getCashSessionReport, getOpenCashSessionSummary, getPosAlertNotifyLink, getPosAlerts, getPosAlertsStatus, getPosConfig, getPosSaleReceipt, getPosSaleReceiptByNumber, getPosSummary, getPosZCloseReport, listCashSessions, listLowStockProducts, listMemberAccountCharges, listPosAlertContacts, listPosAlertDispatchHistory, listPosAlertsCronHistory, listPosAudit, listPosProducts, listPosSales, listStockMovements, notifyCriticalPosAlert, openCashSession, settleMemberAccountCharge, updatePosAlertContact, updatePosConfig, voidPosSale } from '../services/posService';
 import { useAuthStore } from '../stores/authStore';
 
 export default function PosPage() {
@@ -61,6 +61,7 @@ export default function PosPage() {
   const [dispatchHistoryFilters, setDispatchHistoryFilters] = useState({ date_from: '', date_to: '' });
   const [dispatchHistoryRows, setDispatchHistoryRows] = useState([]);
   const [alertsStatus, setAlertsStatus] = useState(null);
+  const [alertsCronHistoryRows, setAlertsCronHistoryRows] = useState([]);
   const [summary, setSummary] = useState({
     today_sales_count: 0,
     today_sales_total: 0,
@@ -70,7 +71,7 @@ export default function PosPage() {
 
   const load = async () => {
     try {
-      const [salesData, chargesData, productsData, movementsData, openCashData, cashSessionsData, posConfig, summaryData, lowStockData, cashByOperatorData, auditData, alertsData, contactsData, dispatchHistoryData, alertsStatusData] = await Promise.all([
+      const [salesData, chargesData, productsData, movementsData, openCashData, cashSessionsData, posConfig, summaryData, lowStockData, cashByOperatorData, auditData, alertsData, contactsData, dispatchHistoryData, alertsStatusData, alertsCronHistoryData] = await Promise.all([
         listPosSales({ page: 1, per_page: 20 }),
         listMemberAccountCharges({ status: 'pending_auto_debit', page: 1, per_page: 20 }),
         listPosProducts(),
@@ -103,6 +104,8 @@ export default function PosPage() {
           date_to: dispatchHistoryFilters.date_to || undefined
         }),
         getPosAlertsStatus()
+        ,
+        listPosAlertsCronHistory({ page: 1, per_page: 10 })
       ]);
       setSales(Array.isArray(salesData?.items) ? salesData.items : []);
       setCharges(Array.isArray(chargesData?.items) ? chargesData.items : []);
@@ -131,6 +134,7 @@ export default function PosPage() {
       setAlertContacts(Array.isArray(contactsData?.items) ? contactsData.items : []);
       setDispatchHistoryRows(Array.isArray(dispatchHistoryData?.items) ? dispatchHistoryData.items : []);
       setAlertsStatus(alertsStatusData ?? null);
+      setAlertsCronHistoryRows(Array.isArray(alertsCronHistoryData?.items) ? alertsCronHistoryData.items : []);
     } catch {
       // no-op
     }
@@ -1095,6 +1099,24 @@ ${sale.notes ? `Nota: ${sale.notes}` : ''}
           ) : auditRows.map((row) => (
             <div key={row.id} className="rounded border border-slate-200 p-2 text-sm">
               #{row.id} · {row.created_at} · {row.entity_type} · {row.action} · user {row.user_id ?? '-'}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="rounded-xl bg-white p-4 shadow-sm">
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <h3 className="text-lg font-semibold text-slate-900">Historial Cron Alerts</h3>
+          <button className="rounded border border-slate-300 px-2 py-1 text-sm disabled:opacity-50" disabled={!canReportRead} onClick={load}>
+            Refrescar
+          </button>
+        </div>
+        <div className="space-y-2">
+          {alertsCronHistoryRows.length === 0 ? (
+            <p className="text-sm text-slate-500">Sin corridas de cron registradas.</p>
+          ) : alertsCronHistoryRows.map((r) => (
+            <div key={r.id} className="rounded border border-slate-200 p-2 text-xs">
+              #{r.id} · {r.created_at} · mode {r.mode ?? '-'} · processed {r.processed ?? 0} · dispatched {r.dispatched ?? 0} · skipped {r.skipped ?? 0}
             </div>
           ))}
         </div>

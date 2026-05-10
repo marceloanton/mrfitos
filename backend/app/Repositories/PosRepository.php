@@ -373,6 +373,68 @@ final class PosRepository
         ];
     }
 
+    public function listPosAlertCronHistory(
+        int $tenantId,
+        int $gymId,
+        int $page,
+        int $perPage
+    ): array {
+        $offset = ($page - 1) * $perPage;
+        $where = 'tenant_id = :tenant_id
+                  AND (
+                    (
+                        action = "pos_alert_critical_cron_run"
+                        AND (
+                            gym_id = :gym_id
+                            OR (
+                                gym_id IS NULL
+                                AND JSON_SEARCH(metadata, "one", :gym_id_as_text, NULL, "$.scope_gym_ids[*]") IS NOT NULL
+                            )
+                        )
+                    )
+                    OR (
+                        action = "pos_alert_critical_notified"
+                        AND gym_id = :gym_id
+                    )
+                  )';
+
+        $params = [
+            'tenant_id' => $tenantId,
+            'gym_id' => $gymId,
+            'gym_id_as_text' => (string) $gymId,
+        ];
+
+        $countStmt = Database::connection()->prepare(
+            "SELECT COUNT(*) FROM activity_logs WHERE {$where}"
+        );
+        $countStmt->execute($params);
+        $total = (int) $countStmt->fetchColumn();
+
+        $stmt = Database::connection()->prepare(
+            "SELECT id, created_at, user_id, tenant_id, gym_id, entity_type, entity_id, action, metadata
+             FROM activity_logs
+             WHERE {$where}
+             ORDER BY CASE WHEN action = 'pos_alert_critical_cron_run' THEN 0 ELSE 1 END, id DESC
+             LIMIT :limit OFFSET :offset"
+        );
+        foreach ($params as $key => $value) {
+            $stmt->bindValue(':' . $key, $value);
+        }
+        $stmt->bindValue(':limit', $perPage, \PDO::PARAM_INT);
+        $stmt->bindValue(':offset', $offset, \PDO::PARAM_INT);
+        $stmt->execute();
+
+        return [
+            'items' => $stmt->fetchAll() ?: [],
+            'meta' => [
+                'page' => $page,
+                'per_page' => $perPage,
+                'total' => $total,
+                'total_pages' => (int) max(1, ceil($total / $perPage)),
+            ],
+        ];
+    }
+
     public function exportCriticalAlertDispatchHistory(
         int $tenantId,
         int $gymId,

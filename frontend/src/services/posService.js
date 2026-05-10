@@ -151,6 +151,11 @@ export async function getPosAlertsStatus(params = {}) {
   return payload(data);
 }
 
+export async function listPosAlertsCronHistory(params = {}) {
+  const { data } = await api.get('/pos/alerts/cron-history', { params });
+  return payload(data);
+}
+
 export async function listPosAlertContacts() {
   const { data } = await api.get('/pos/alerts/contacts');
   return payload(data);
