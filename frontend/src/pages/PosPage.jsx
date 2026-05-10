@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { adjustStock, autoSettleMemberAccountCharges, bulkMarkPromiseAgendaContacted, closeCashSession, createPosAlertContact, createPosProduct, createPosSale, deletePosAlertContact, exportMemberAccountCollectorRankingCsv, exportMemberAccountContactEffectivenessCsv, exportMemberAccountPromiseAgendaCsv, exportOverduePromiseWhatsAppLinksCsv, exportPosAlertDispatchHistoryCsv, exportPosAuditCsv, exportPosAutosettleKpiCsv, exportPosZCloseCsv, getCashByOperatorReport, getCashSessionReport, getMemberAccountAging, getMemberAccountCollectorRanking, getMemberAccountCollectionsKpiToday, getMemberAccountContactEffectiveness, getMemberAccountFollowupFunnel, getMemberAccountOverdueWhatsAppLink, getMemberAccountPromiseAgenda, getOpenCashSessionSummary, getOverduePromiseWhatsAppLinks, getPosAlertNotifyLink, getPosAlerts, getPosAlertsStatus, getPosAutosettleKpi, getPosConfig, getPosSaleReceipt, getPosSaleReceiptByNumber, getPosSummary, getPosZCloseReport, listCashSessions, listLowStockProducts, listMemberAccountCharges, listPosAlertContacts, listPosAlertDispatchHistory, listPosAlertsCronHistory, listPosAudit, listPosProducts, listPosSales, listStockMovements, notifyCriticalPosAlert, openCashSession, settleMemberAccountCharge, updateMemberAccountFollowupContactResult, updatePosAlertContact, updatePosConfig, upsertMemberAccountFollowup, voidPosSale } from '../services/posService';
 import { useAuthStore } from '../stores/authStore';
 
@@ -140,6 +140,7 @@ export default function PosPage() {
     today_cash_collected: 0,
     pending_member_account_total: 0
   });
+  const rankingFiltersHydratedRef = useRef(false);
   const collectorPrefsStorageKey = user
     ? `pos-collector-ranking-prefs-v1:${user.id || user.email || 'user'}:${user.gym_id || 'gym'}`
     : null;
@@ -359,6 +360,7 @@ export default function PosPage() {
     } catch {
       // ignore broken local preferences
     }
+    rankingFiltersHydratedRef.current = true;
   }, [collectorPrefsStorageKey]);
 
   useEffect(() => {
@@ -369,6 +371,11 @@ export default function PosPage() {
       sort_dir: collectorRankingSortDir
     }));
   }, [collectorPrefsStorageKey, collectorRankingLimit, collectorRankingSortBy, collectorRankingSortDir]);
+
+  useEffect(() => {
+    if (!rankingFiltersHydratedRef.current) return;
+    load();
+  }, [collectorRankingLimit, collectorRankingSortBy, collectorRankingSortDir]);
 
   const onAdjustStock = async () => {
     setError('');
