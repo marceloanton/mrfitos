@@ -7,6 +7,11 @@ Este cron dispara el flujo de alerta crítica POS con cooldown usando el endpoin
 - `POST /cron/pos/alerts/dispatch`
 - Seguridad: `CronTokenMiddleware` (header `X-Cron-Token`)
 
+## Modos de ejecución
+
+- `single`: enviando `tenant_id` + `gym_id`.
+- `bulk`: sin `tenant_id` ni `gym_id`, procesa todas las sedes activas.
+
 ## Body (opcional)
 
 ```json
@@ -24,6 +29,7 @@ Este cron dispara el flujo de alerta crítica POS con cooldown usando el endpoin
 ```
 
 Si `tenant_id` y `gym_id` no se envían, en MVP usa fallback `tenant_id=1`, `gym_id=1`.
+Si no se envían, el endpoint puede ejecutarse en modo masivo (`bulk`) sobre sedes activas.
 
 ## Ejemplo cURL
 
@@ -65,6 +71,24 @@ Requiere variable de entorno `CRON_BEARER_TOKEN` configurada en Windows.
     "gym_id": 1,
     "dispatched": false,
     "reason": "not_critical"
+  }
+}
+```
+
+## Respuesta en modo bulk
+
+```json
+{
+  "success": true,
+  "data": {
+    "mode": "bulk",
+    "processed": 3,
+    "dispatched": 1,
+    "skipped": 2,
+    "items": [
+      { "tenant_id": 1, "gym_id": 1, "dispatched": false, "reason": "not_critical", "level": "ok" },
+      { "tenant_id": 1, "gym_id": 2, "dispatched": true, "level": "critical" }
+    ]
   }
 }
 ```

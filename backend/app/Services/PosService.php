@@ -1317,6 +1317,15 @@ final class PosService
         ];
     }
 
+    public function listActiveTenantGymScopes(): array
+    {
+        $rows = $this->repo->listActiveTenantGymScopes();
+        return array_values(array_filter(array_map(static fn (array $row): array => [
+            'tenant_id' => (int) ($row['tenant_id'] ?? 0),
+            'gym_id' => (int) ($row['gym_id'] ?? 0),
+        ], $rows), static fn (array $scope): bool => $scope['tenant_id'] > 0 && $scope['gym_id'] > 0));
+    }
+
     private function getRequireOpenCash(int $tenantId, int $gymId): bool
     {
         $stored = $this->repo->getSetting($tenantId, $gymId, self::SETTING_REQUIRE_OPEN_CASH);

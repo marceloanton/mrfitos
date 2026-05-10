@@ -1508,6 +1508,22 @@ final class PosRepository
         return $row ?: null;
     }
 
+    public function listActiveTenantGymScopes(): array
+    {
+        $stmt = Database::connection()->prepare(
+            'SELECT g.tenant_id, g.id AS gym_id
+             FROM gyms g
+             INNER JOIN tenants t ON t.id = g.tenant_id
+             WHERE g.deleted_at IS NULL
+               AND t.deleted_at IS NULL
+               AND g.status = "active"
+               AND t.status = "active"
+             ORDER BY g.tenant_id ASC, g.id ASC'
+        );
+        $stmt->execute();
+        return $stmt->fetchAll() ?: [];
+    }
+
     public function findLatestCriticalAlertDispatch(int $tenantId, int $gymId): ?array
     {
         return $this->findLatestActivityByAction($tenantId, $gymId, 'pos_alert_critical_notified');

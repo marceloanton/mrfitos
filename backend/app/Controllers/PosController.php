@@ -459,39 +459,76 @@ final class PosController
 
             $tenantId = isset($input['tenant_id']) ? (int) $input['tenant_id'] : 0;
             $gymId = isset($input['gym_id']) ? (int) $input['gym_id'] : 0;
-            $usedFallback = false;
+            if ($tenantId > 0 && $gymId > 0) {
+                $data = $this->service->notifyCriticalOperationalAlerts($tenantId, $gymId, 0, $input);
+                $item = [
+                    'tenant_id' => $tenantId,
+                    'gym_id' => $gymId,
+                    'dispatched' => (bool) ($data['dispatched'] ?? false),
+                ];
+                if (isset($data['reason'])) {
+                    $item['reason'] = (string) $data['reason'];
+                }
+                if (isset($data['level'])) {
+                    $item['level'] = (string) $data['level'];
+                }
 
-            if ($tenantId <= 0 || $gymId <= 0) {
-                $tenantId = 1;
-                $gymId = 1;
-                $usedFallback = true;
-            }
-
-            $data = $this->service->notifyCriticalOperationalAlerts($tenantId, $gymId, 0, $input);
-
-            $response = [
-                'tenant_id' => $tenantId,
-                'gym_id' => $gymId,
-                'dispatched' => (bool) ($data['dispatched'] ?? false),
-            ];
-
-            if (isset($data['reason'])) {
-                $response['reason'] = (string) $data['reason'];
-            }
-            if (isset($data['level'])) {
-                $response['level'] = (string) $data['level'];
-            }
-            if (isset($data['whatsapp_link']) && is_string($data['whatsapp_link']) && trim($data['whatsapp_link']) !== '') {
-                $response['whatsapp_link'] = $data['whatsapp_link'];
-            }
-            if (isset($data['cooldown_until']) && is_string($data['cooldown_until']) && trim($data['cooldown_until']) !== '') {
-                $response['cooldown_until'] = $data['cooldown_until'];
-            }
-            if ($usedFallback) {
-                $response['note'] = 'MVP fallback applied: tenant_id=1 and gym_id=1. Future cron should iterate all tenant/gym scopes.';
+                Response::json([
+                    'success' => true,
+                    'data' => [
+                        'mode' => 'single',
+                        'processed' => 1,
+                        'dispatched' => $item['dispatched'] ? 1 : 0,
+                        'skipped' => $item['dispatched'] ? 0 : 1,
+                        'items' => [$item],
+                    ]
+                ]);
+                return;
             }
 
-            Response::json(['success' => true, 'data' => $response]);
+            $scopes = $this->service->listActiveTenantGymScopes();
+            $items = [];
+            $dispatchedCount = 0;
+            $skippedCount = 0;
+
+            foreach ($scopes as $scope) {
+                $scopeTenantId = (int) ($scope['tenant_id'] ?? 0);
+                $scopeGymId = (int) ($scope['gym_id'] ?? 0);
+                if ($scopeTenantId <= 0 || $scopeGymId <= 0) {
+                    continue;
+                }
+
+                $data = $this->service->notifyCriticalOperationalAlerts($scopeTenantId, $scopeGymId, 0, $input);
+                $wasDispatched = (bool) ($data['dispatched'] ?? false);
+                $item = [
+                    'tenant_id' => $scopeTenantId,
+                    'gym_id' => $scopeGymId,
+                    'dispatched' => $wasDispatched,
+                ];
+                if (isset($data['reason'])) {
+                    $item['reason'] = (string) $data['reason'];
+                }
+                if (isset($data['level'])) {
+                    $item['level'] = (string) $data['level'];
+                }
+                $items[] = $item;
+                if ($wasDispatched) {
+                    $dispatchedCount++;
+                } else {
+                    $skippedCount++;
+                }
+            }
+
+            Response::json([
+                'success' => true,
+                'data' => [
+                    'mode' => 'bulk',
+                    'processed' => count($items),
+                    'dispatched' => $dispatchedCount,
+                    'skipped' => $skippedCount,
+                    'items' => $items,
+                ]
+            ]);
         } catch (\InvalidArgumentException $e) {
             Response::json(['success' => false, 'message' => $e->getMessage()], 422);
         } catch (\Throwable $e) {
