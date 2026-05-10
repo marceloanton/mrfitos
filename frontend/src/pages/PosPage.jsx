@@ -119,6 +119,14 @@ export default function PosPage() {
   const [collectorRanking, setCollectorRanking] = useState([]);
   const [collectorRankingLimit, setCollectorRankingLimit] = useState('25');
   const [collectorRankingSortBy, setCollectorRankingSortBy] = useState('recovered_amount');
+  const [collectorRankingSummary, setCollectorRankingSummary] = useState({
+    collectors_count: 0,
+    total_recovered_amount: 0,
+    total_commission_amount: 0,
+    total_contacts_count: 0,
+    top_collector_name: '',
+    top_collector_recovered_amount: 0
+  });
   const [collectorCommissionRules, setCollectorCommissionRules] = useState(null);
   const [summary, setSummary] = useState({
     today_sales_count: 0,
@@ -293,6 +301,14 @@ export default function PosPage() {
         promise_confirmation_rate: Number(contactEffectivenessData?.promise_confirmation_rate ?? 0)
       });
       setCollectorRanking(Array.isArray(collectorRankingData?.items) ? collectorRankingData.items : []);
+      setCollectorRankingSummary({
+        collectors_count: Number(collectorRankingData?.summary?.collectors_count ?? 0),
+        total_recovered_amount: Number(collectorRankingData?.summary?.total_recovered_amount ?? 0),
+        total_commission_amount: Number(collectorRankingData?.summary?.total_commission_amount ?? 0),
+        total_contacts_count: Number(collectorRankingData?.summary?.total_contacts_count ?? 0),
+        top_collector_name: String(collectorRankingData?.summary?.top_collector_name ?? ''),
+        top_collector_recovered_amount: Number(collectorRankingData?.summary?.top_collector_recovered_amount ?? 0)
+      });
       setCollectorCommissionRules(collectorRankingData?.commission_rules ?? null);
     } catch (err) {
       setError(toFriendlyApiError(err, 'No se pudieron actualizar los indicadores de seguimiento.'));
@@ -1062,6 +1078,25 @@ ${sale.notes ? `Nota: ${sale.notes}` : ''}
         </div>
         <div className="mb-3 rounded border border-slate-200 p-2">
           <p className="mb-2 text-sm font-medium text-slate-700">Ranking de cobradores</p>
+          <div className="mb-2 grid gap-2 md:grid-cols-4">
+            <div className="rounded border border-slate-200 p-2">
+              <p className="text-xs text-slate-500">Cobradores activos</p>
+              <p className="text-lg font-semibold text-slate-900">{collectorRankingSummary.collectors_count}</p>
+            </div>
+            <div className="rounded border border-emerald-200 p-2">
+              <p className="text-xs text-emerald-700">Recuperado total</p>
+              <p className="text-lg font-semibold text-emerald-700">${collectorRankingSummary.total_recovered_amount.toFixed(2)}</p>
+            </div>
+            <div className="rounded border border-amber-200 p-2">
+              <p className="text-xs text-amber-700">Comisión estimada</p>
+              <p className="text-lg font-semibold text-amber-700">${collectorRankingSummary.total_commission_amount.toFixed(2)}</p>
+            </div>
+            <div className="rounded border border-slate-200 p-2">
+              <p className="text-xs text-slate-500">Top cobrador</p>
+              <p className="text-sm font-semibold text-slate-900">{collectorRankingSummary.top_collector_name || '-'}</p>
+              <p className="text-xs text-slate-500">${collectorRankingSummary.top_collector_recovered_amount.toFixed(2)}</p>
+            </div>
+          </div>
           {collectorCommissionRules && (
             <p className="mb-2 text-xs text-slate-500">
               Regla comisión: hasta ${Number(collectorCommissionRules.tier1_max || 0).toFixed(0)} {"=>"} {Number(collectorCommissionRules.tier1_rate || 0).toFixed(2)}%, hasta ${Number(collectorCommissionRules.tier2_max || 0).toFixed(0)} {"=>"} {Number(collectorCommissionRules.tier2_rate || 0).toFixed(2)}%, mayor {"=>"} {Number(collectorCommissionRules.tier3_rate || 0).toFixed(2)}%.
