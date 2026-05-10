@@ -132,7 +132,8 @@ export default function PosPage() {
   });
   const [collectorCommissionRules, setCollectorCommissionRules] = useState(null);
   const [followupLoading, setFollowupLoading] = useState(false);
-  const [followupExportLoading, setFollowupExportLoading] = useState(false);
+  const [contactEffectivenessExportLoading, setContactEffectivenessExportLoading] = useState(false);
+  const [collectorRankingExportLoading, setCollectorRankingExportLoading] = useState(false);
   const [summary, setSummary] = useState({
     today_sales_count: 0,
     today_sales_total: 0,
@@ -967,7 +968,7 @@ ${sale.notes ? `Nota: ${sale.notes}` : ''}
     if (!validateFollowupRange()) {
       return;
     }
-    setFollowupExportLoading(true);
+    setContactEffectivenessExportLoading(true);
     try {
       const blob = await exportMemberAccountContactEffectivenessCsv({
         date_from: followupDateFrom || undefined,
@@ -982,7 +983,7 @@ ${sale.notes ? `Nota: ${sale.notes}` : ''}
     } catch (err) {
       setError(toFriendlyApiError(err, 'No se pudo exportar efectividad de contacto.'));
     } finally {
-      setFollowupExportLoading(false);
+      setContactEffectivenessExportLoading(false);
     }
   };
 
@@ -991,7 +992,7 @@ ${sale.notes ? `Nota: ${sale.notes}` : ''}
     if (!validateFollowupRange()) {
       return;
     }
-    setFollowupExportLoading(true);
+    setCollectorRankingExportLoading(true);
     try {
       const blob = await exportMemberAccountCollectorRankingCsv({
         date_from: followupDateFrom || undefined,
@@ -1009,7 +1010,7 @@ ${sale.notes ? `Nota: ${sale.notes}` : ''}
     } catch (err) {
       setError(toFriendlyApiError(err, 'No se pudo exportar ranking de cobradores.'));
     } finally {
-      setFollowupExportLoading(false);
+      setCollectorRankingExportLoading(false);
     }
   };
 
@@ -1174,11 +1175,11 @@ ${sale.notes ? `Nota: ${sale.notes}` : ''}
           <button className="mr-2 rounded border border-emerald-300 px-3 py-2 text-sm text-emerald-700 disabled:opacity-50" disabled={!canReportExport} onClick={onExportOverduePromiseWhatsAppCsv}>
             Exportar Links WhatsApp
           </button>
-          <button className="mr-2 rounded border border-slate-300 px-3 py-2 text-sm disabled:opacity-50" disabled={!canReportExport || !isFollowupRangeValid || followupExportLoading} onClick={onExportContactEffectivenessCsv}>
-            {followupExportLoading ? 'Exportando...' : 'Exportar Efectividad CSV'}
+          <button className="mr-2 rounded border border-slate-300 px-3 py-2 text-sm disabled:opacity-50" disabled={!canReportExport || !isFollowupRangeValid || contactEffectivenessExportLoading} onClick={onExportContactEffectivenessCsv}>
+            {contactEffectivenessExportLoading ? 'Exportando...' : 'Exportar Efectividad CSV'}
           </button>
-          <button className="mr-2 rounded border border-slate-300 px-3 py-2 text-sm disabled:opacity-50" disabled={!canReportExport || !isFollowupRangeValid || followupExportLoading} onClick={onExportCollectorRankingCsv}>
-            {followupExportLoading ? 'Exportando...' : 'Exportar Ranking CSV'}
+          <button className="mr-2 rounded border border-slate-300 px-3 py-2 text-sm disabled:opacity-50" disabled={!canReportExport || !isFollowupRangeValid || collectorRankingExportLoading} onClick={onExportCollectorRankingCsv}>
+            {collectorRankingExportLoading ? 'Exportando...' : 'Exportar Ranking CSV'}
           </button>
           <button className="rounded border border-slate-300 px-3 py-2 text-sm disabled:opacity-50" disabled={!canReportExport} onClick={onExportPromiseAgendaCsv}>
             Exportar Agenda CSV
