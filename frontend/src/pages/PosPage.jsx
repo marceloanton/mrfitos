@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { adjustStock, autoSettleMemberAccountCharges, bulkMarkPromiseAgendaContacted, closeCashSession, createPosAlertContact, createPosProduct, createPosSale, deletePosAlertContact, exportMemberAccountContactEffectivenessCsv, exportMemberAccountPromiseAgendaCsv, exportOverduePromiseWhatsAppLinksCsv, exportPosAlertDispatchHistoryCsv, exportPosAuditCsv, exportPosAutosettleKpiCsv, exportPosZCloseCsv, getCashByOperatorReport, getCashSessionReport, getMemberAccountAging, getMemberAccountCollectionsKpiToday, getMemberAccountContactEffectiveness, getMemberAccountFollowupFunnel, getMemberAccountOverdueWhatsAppLink, getMemberAccountPromiseAgenda, getOpenCashSessionSummary, getOverduePromiseWhatsAppLinks, getPosAlertNotifyLink, getPosAlerts, getPosAlertsStatus, getPosAutosettleKpi, getPosConfig, getPosSaleReceipt, getPosSaleReceiptByNumber, getPosSummary, getPosZCloseReport, listCashSessions, listLowStockProducts, listMemberAccountCharges, listPosAlertContacts, listPosAlertDispatchHistory, listPosAlertsCronHistory, listPosAudit, listPosProducts, listPosSales, listStockMovements, notifyCriticalPosAlert, openCashSession, settleMemberAccountCharge, updateMemberAccountFollowupContactResult, updatePosAlertContact, updatePosConfig, upsertMemberAccountFollowup, voidPosSale } from '../services/posService';
+import { adjustStock, autoSettleMemberAccountCharges, bulkMarkPromiseAgendaContacted, closeCashSession, createPosAlertContact, createPosProduct, createPosSale, deletePosAlertContact, exportMemberAccountContactEffectivenessCsv, exportMemberAccountPromiseAgendaCsv, exportOverduePromiseWhatsAppLinksCsv, exportPosAlertDispatchHistoryCsv, exportPosAuditCsv, exportPosAutosettleKpiCsv, exportPosZCloseCsv, getCashByOperatorReport, getCashSessionReport, getMemberAccountAging, getMemberAccountCollectorRanking, getMemberAccountCollectionsKpiToday, getMemberAccountContactEffectiveness, getMemberAccountFollowupFunnel, getMemberAccountOverdueWhatsAppLink, getMemberAccountPromiseAgenda, getOpenCashSessionSummary, getOverduePromiseWhatsAppLinks, getPosAlertNotifyLink, getPosAlerts, getPosAlertsStatus, getPosAutosettleKpi, getPosConfig, getPosSaleReceipt, getPosSaleReceiptByNumber, getPosSummary, getPosZCloseReport, listCashSessions, listLowStockProducts, listMemberAccountCharges, listPosAlertContacts, listPosAlertDispatchHistory, listPosAlertsCronHistory, listPosAudit, listPosProducts, listPosSales, listStockMovements, notifyCriticalPosAlert, openCashSession, settleMemberAccountCharge, updateMemberAccountFollowupContactResult, updatePosAlertContact, updatePosConfig, upsertMemberAccountFollowup, voidPosSale } from '../services/posService';
 import { useAuthStore } from '../stores/authStore';
 
 export default function PosPage() {
@@ -115,6 +115,7 @@ export default function PosPage() {
     overdue_count: 0,
     items: []
   });
+  const [collectorRanking, setCollectorRanking] = useState([]);
   const [summary, setSummary] = useState({
     today_sales_count: 0,
     today_sales_total: 0,
@@ -124,7 +125,7 @@ export default function PosPage() {
 
   const load = async () => {
     try {
-      const [salesData, chargesData, productsData, movementsData, openCashData, cashSessionsData, posConfig, summaryData, lowStockData, cashByOperatorData, auditData, alertsData, contactsData, dispatchHistoryData, alertsStatusData, alertsCronHistoryData, autosettleKpiData, memberAccountAgingData, collectionsKpiData, followupFunnelData, promiseAgendaData, contactEffectivenessData] = await Promise.all([
+      const [salesData, chargesData, productsData, movementsData, openCashData, cashSessionsData, posConfig, summaryData, lowStockData, cashByOperatorData, auditData, alertsData, contactsData, dispatchHistoryData, alertsStatusData, alertsCronHistoryData, autosettleKpiData, memberAccountAgingData, collectionsKpiData, followupFunnelData, promiseAgendaData, contactEffectivenessData, collectorRankingData] = await Promise.all([
         listPosSales({ page: 1, per_page: 20 }),
         listMemberAccountCharges({ status: 'pending_auto_debit', page: 1, per_page: 20 }),
         listPosProducts(),
@@ -170,6 +171,10 @@ export default function PosPage() {
         }),
         getMemberAccountPromiseAgenda({ limit: 20 }),
         getMemberAccountContactEffectiveness({
+          date_from: followupDateFrom || undefined,
+          date_to: followupDateTo || undefined
+        }),
+        getMemberAccountCollectorRanking({
           date_from: followupDateFrom || undefined,
           date_to: followupDateTo || undefined
         })
@@ -240,6 +245,7 @@ export default function PosPage() {
         response_rate: Number(contactEffectivenessData?.response_rate ?? 0),
         promise_confirmation_rate: Number(contactEffectivenessData?.promise_confirmation_rate ?? 0)
       });
+      setCollectorRanking(Array.isArray(collectorRankingData?.items) ? collectorRankingData.items : []);
     } catch {
       // no-op
     }
@@ -934,6 +940,17 @@ ${sale.notes ? `Nota: ${sale.notes}` : ''}
             <p className="text-xs uppercase tracking-wide text-red-600">Promesas vencidas</p>
             <p className="text-lg font-semibold text-red-700">{promiseAgenda.overdue_count}</p>
           </div>
+        </div>
+        <div className="mb-3 rounded border border-slate-200 p-2">
+          <p className="mb-2 text-sm font-medium text-slate-700">Ranking de cobradores</p>
+          {collectorRanking.length === 0 ? (
+            <p className="text-sm text-slate-500">Sin actividad en el rango.</p>
+          ) : collectorRanking.map((r) => (
+            <div key={r.user_id} className="flex items-center justify-between border-t border-slate-100 py-1 text-sm first:border-t-0">
+              <span>{r.user_name || r.user_email || `user#${r.user_id}`}</span>
+              <span className="font-semibold">${Number(r.recovered_amount || 0).toFixed(2)} · resp {Number(r.response_rate || 0).toFixed(2)}%</span>
+            </div>
+          ))}
         </div>
         <div className="mb-3 flex justify-end">
           <button className="mr-2 rounded border border-amber-300 px-3 py-2 text-sm text-amber-700 disabled:opacity-50" disabled={!canSaleCreate} onClick={onBulkMarkPromiseContacted}>

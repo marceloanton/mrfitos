@@ -113,6 +113,11 @@ export async function exportMemberAccountContactEffectivenessCsv(params = {}) {
   return data;
 }
 
+export async function getMemberAccountCollectorRanking(params = {}) {
+  const { data } = await api.get('/pos/member-account/collector-ranking', { params });
+  return payload(data);
+}
+
 export async function getMemberAccountFollowupFunnel(params = {}) {
   const { data } = await api.get('/pos/member-account/followup-funnel', { params });
   return payload(data);

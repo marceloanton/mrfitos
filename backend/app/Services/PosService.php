@@ -550,6 +550,45 @@ final class PosService
         ];
     }
 
+    public function getMemberAccountCollectorRanking(int $tenantId, int $gymId, mixed $dateFromInput, mixed $dateToInput): array
+    {
+        $dateFrom = $this->resolveOptionalDate($dateFromInput, 'date_from');
+        $dateTo = $this->resolveOptionalDate($dateToInput, 'date_to');
+        if ($dateFrom === null && $dateTo === null) {
+            $dateTo = date('Y-m-d');
+            $dateFrom = date('Y-m-d', strtotime('-6 days'));
+        } elseif ($dateFrom === null) {
+            $dateFrom = $dateTo;
+        } elseif ($dateTo === null) {
+            $dateTo = $dateFrom;
+        }
+        if ($dateFrom > $dateTo) {
+            throw new \InvalidArgumentException('date_from must be <= date_to');
+        }
+
+        $rows = $this->repo->getMemberAccountCollectorRanking($tenantId, $gymId, $dateFrom, $dateTo);
+        $items = array_map(static function (array $row): array {
+            $contacts = (int) ($row['contacts_count'] ?? 0);
+            $responses = (int) ($row['responses_count'] ?? 0);
+            return [
+                'user_id' => (int) ($row['user_id'] ?? 0),
+                'user_email' => (string) ($row['user_email'] ?? ''),
+                'user_name' => trim((string) ($row['user_name'] ?? '')),
+                'contacts_count' => $contacts,
+                'responses_count' => $responses,
+                'response_rate' => $contacts > 0 ? round(($responses / $contacts) * 100, 2) : 0.0,
+                'settlements_count' => (int) ($row['settlements_count'] ?? 0),
+                'recovered_amount' => (float) ($row['recovered_amount'] ?? 0),
+            ];
+        }, $rows);
+
+        return [
+            'date_from' => $dateFrom,
+            'date_to' => $dateTo,
+            'items' => $items,
+        ];
+    }
+
     public function createProduct(int $tenantId, int $gymId, array $input): int
     {
         $name = trim((string) ($input['name'] ?? ''));

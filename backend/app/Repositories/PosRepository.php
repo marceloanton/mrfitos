@@ -2074,4 +2074,37 @@ final class PosRepository
         ]);
         return $stmt->fetch() ?: [];
     }
+
+    public function getMemberAccountCollectorRanking(int $tenantId, int $gymId, string $dateFrom, string $dateTo): array
+    {
+        $from = $dateFrom . ' 00:00:00';
+        $to = $dateTo . ' 23:59:59';
+        $stmt = Database::connection()->prepare(
+            'SELECT
+                al.user_id,
+                COALESCE(MAX(u.email), "") AS user_email,
+                COALESCE(MAX(CONCAT(COALESCE(u.first_name, ""), " ", COALESCE(u.last_name, ""))), "") AS user_name,
+                COALESCE(SUM(CASE WHEN al.action IN ("pos_member_account_overdue_whatsapp_opened", "pos_member_account_contact_result_updated") THEN 1 ELSE 0 END), 0) AS contacts_count,
+                COALESCE(SUM(CASE WHEN al.action = "pos_member_account_contact_result_updated" AND JSON_UNQUOTE(JSON_EXTRACT(al.metadata, "$.result")) = "responded" THEN 1 ELSE 0 END), 0) AS responses_count,
+                COALESCE(SUM(CASE WHEN al.action = "pos_member_account_charge_settled" AND al.user_id IS NOT NULL THEN 1 ELSE 0 END), 0) AS settlements_count,
+                COALESCE(SUM(CASE WHEN al.action = "pos_member_account_charge_settled" AND al.user_id IS NOT NULL THEN CAST(JSON_UNQUOTE(JSON_EXTRACT(al.metadata, "$.amount")) AS DECIMAL(12,2)) ELSE 0 END), 0) AS recovered_amount
+             FROM activity_logs al
+             LEFT JOIN users u ON u.id = al.user_id
+             WHERE al.tenant_id = :tenant_id
+               AND al.gym_id = :gym_id
+               AND al.user_id IS NOT NULL
+               AND al.created_at >= :from_dt
+               AND al.created_at <= :to_dt
+               AND al.action IN ("pos_member_account_overdue_whatsapp_opened","pos_member_account_contact_result_updated","pos_member_account_charge_settled")
+             GROUP BY al.user_id
+             ORDER BY recovered_amount DESC, responses_count DESC, contacts_count DESC'
+        );
+        $stmt->execute([
+            'tenant_id' => $tenantId,
+            'gym_id' => $gymId,
+            'from_dt' => $from,
+            'to_dt' => $to,
+        ]);
+        return $stmt->fetchAll() ?: [];
+    }
 }
