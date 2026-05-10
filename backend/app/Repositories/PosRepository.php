@@ -226,6 +226,107 @@ final class PosRepository
         ];
     }
 
+    public function getDailyCashSessionsSummary(int $tenantId, int $gymId, string $date): array
+    {
+        $stmt = Database::connection()->prepare(
+            'SELECT
+                COUNT(CASE WHEN status = "open" THEN 1 END) AS opened_count,
+                COUNT(CASE WHEN status = "closed" THEN 1 END) AS closed_count,
+                COALESCE(SUM(opening_amount), 0) AS opening_total,
+                COALESCE(SUM(expected_amount), 0) AS expected_total,
+                COALESCE(SUM(closing_amount), 0) AS closing_total,
+                COALESCE(SUM(difference_amount), 0) AS difference_total
+             FROM pos_cash_sessions
+             WHERE tenant_id = :tenant_id
+               AND gym_id = :gym_id
+               AND DATE(opened_at) = :report_date'
+        );
+        $stmt->execute([
+            'tenant_id' => $tenantId,
+            'gym_id' => $gymId,
+            'report_date' => $date
+        ]);
+        $row = $stmt->fetch() ?: [];
+
+        return [
+            'opened_count' => (int) ($row['opened_count'] ?? 0),
+            'closed_count' => (int) ($row['closed_count'] ?? 0),
+            'opening_total' => (float) ($row['opening_total'] ?? 0),
+            'expected_total' => (float) ($row['expected_total'] ?? 0),
+            'closing_total' => (float) ($row['closing_total'] ?? 0),
+            'difference_total' => (float) ($row['difference_total'] ?? 0),
+        ];
+    }
+
+    public function getDailyPaymentsByMethod(int $tenantId, int $gymId, string $date): array
+    {
+        $stmt = Database::connection()->prepare(
+            'SELECT method, COALESCE(SUM(amount), 0) AS total_amount
+             FROM payments
+             WHERE tenant_id = :tenant_id
+               AND gym_id = :gym_id
+               AND deleted_at IS NULL
+               AND status = "paid"
+               AND DATE(paid_at) = :report_date
+             GROUP BY method'
+        );
+        $stmt->execute([
+            'tenant_id' => $tenantId,
+            'gym_id' => $gymId,
+            'report_date' => $date
+        ]);
+        return $stmt->fetchAll() ?: [];
+    }
+
+    public function getDailyPosSalesSummary(int $tenantId, int $gymId, string $date): array
+    {
+        $stmt = Database::connection()->prepare(
+            'SELECT COUNT(*) AS sales_count, COALESCE(SUM(total_amount), 0) AS sales_total
+             FROM pos_sales
+             WHERE tenant_id = :tenant_id
+               AND gym_id = :gym_id
+               AND deleted_at IS NULL
+               AND DATE(created_at) = :report_date'
+        );
+        $stmt->execute([
+            'tenant_id' => $tenantId,
+            'gym_id' => $gymId,
+            'report_date' => $date
+        ]);
+        $row = $stmt->fetch() ?: [];
+        return [
+            'sales_count' => (int) ($row['sales_count'] ?? 0),
+            'sales_total' => (float) ($row['sales_total'] ?? 0),
+        ];
+    }
+
+    public function getDailySettledMemberAccountSummary(int $tenantId, int $gymId, string $date): array
+    {
+        $stmt = Database::connection()->prepare(
+            'SELECT COUNT(*) AS settled_count, COALESCE(SUM(c.amount), 0) AS settled_total
+             FROM member_account_charges c
+             INNER JOIN payments p ON p.id = c.settled_payment_id
+             WHERE c.tenant_id = :tenant_id
+               AND c.gym_id = :gym_id
+               AND c.status = "settled"
+               AND p.tenant_id = :tenant_id
+               AND p.gym_id = :gym_id
+               AND p.deleted_at IS NULL
+               AND p.status = "paid"
+               AND DATE(p.paid_at) = :report_date'
+        );
+        $stmt->execute([
+            'tenant_id' => $tenantId,
+            'gym_id' => $gymId,
+            'report_date' => $date
+        ]);
+        $row = $stmt->fetch() ?: [];
+        return [
+            'settled_count' => (int) ($row['settled_count'] ?? 0),
+            'settled_total' => (float) ($row['settled_total'] ?? 0),
+        ];
+    }
+
     public function getSetting(int $tenantId, ?int $gymId, string $key): ?string
     {
         $stmt = Database::connection()->prepare(

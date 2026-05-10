@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { adjustStock, closeCashSession, createPosProduct, createPosSale, getCashSessionReport, getOpenCashSessionSummary, getPosConfig, getPosSaleReceipt, getPosSaleReceiptByNumber, getPosSummary, listCashSessions, listMemberAccountCharges, listPosProducts, listPosSales, listStockMovements, openCashSession, settleMemberAccountCharge, updatePosConfig } from '../services/posService';
+import { adjustStock, closeCashSession, createPosProduct, createPosSale, getCashSessionReport, getOpenCashSessionSummary, getPosConfig, getPosSaleReceipt, getPosSaleReceiptByNumber, getPosSummary, getPosZCloseReport, listCashSessions, listMemberAccountCharges, listPosProducts, listPosSales, listStockMovements, openCashSession, settleMemberAccountCharge, updatePosConfig } from '../services/posService';
 
 export default function PosPage() {
   const [requireOpenCash, setRequireOpenCash] = useState(true);
@@ -26,6 +26,7 @@ export default function PosPage() {
   const [openingAmount, setOpeningAmount] = useState('');
   const [closingAmount, setClosingAmount] = useState('');
   const [receiptNumber, setReceiptNumber] = useState('');
+  const [zCloseDate, setZCloseDate] = useState(new Date().toISOString().slice(0, 10));
   const [summary, setSummary] = useState({
     today_sales_count: 0,
     today_sales_total: 0,
@@ -266,6 +267,70 @@ ${sale.notes ? `Nota: ${sale.notes}` : ''}
     }
   };
 
+  const onPrintZClose = async () => {
+    setError('');
+    try {
+      const report = await getPosZCloseReport({ date: zCloseDate });
+      const methods = report?.payments?.by_method ?? {};
+      const html = `
+        <html>
+          <head>
+            <title>Cierre Z ${report?.date ?? zCloseDate}</title>
+            <style>
+              body { font-family: Arial, sans-serif; padding: 24px; color: #0f172a; }
+              h1 { margin: 0 0 8px 0; font-size: 24px; }
+              h2 { margin: 20px 0 8px 0; font-size: 16px; }
+              table { border-collapse: collapse; width: 100%; margin-top: 8px; }
+              th, td { border: 1px solid #cbd5e1; padding: 8px; text-align: left; font-size: 13px; }
+            </style>
+          </head>
+          <body>
+            <h1>MRFitOS - Cierre Z ${report?.date ?? zCloseDate}</h1>
+            <h2>Sesiones de Caja</h2>
+            <table>
+              <tr><th>Aperturas</th><td>${report?.cash_sessions?.opened_count ?? 0}</td></tr>
+              <tr><th>Cierres</th><td>${report?.cash_sessions?.closed_count ?? 0}</td></tr>
+              <tr><th>Total aperturas</th><td>${report?.cash_sessions?.opening_total ?? 0}</td></tr>
+              <tr><th>Total esperado</th><td>${report?.cash_sessions?.expected_total ?? 0}</td></tr>
+              <tr><th>Total cierres</th><td>${report?.cash_sessions?.closing_total ?? 0}</td></tr>
+              <tr><th>Diferencia total</th><td>${report?.cash_sessions?.difference_total ?? 0}</td></tr>
+            </table>
+            <h2>Cobros por método</h2>
+            <table>
+              <tr><th>Efectivo</th><td>${methods.cash ?? 0}</td></tr>
+              <tr><th>Transferencia</th><td>${methods.transfer ?? 0}</td></tr>
+              <tr><th>Mercado Pago</th><td>${methods.mercadopago ?? 0}</td></tr>
+              <tr><th>Tarjeta</th><td>${methods.card ?? 0}</td></tr>
+              <tr><th>Otros</th><td>${methods.other ?? 0}</td></tr>
+              <tr><th>Total</th><td>${report?.payments?.total ?? 0}</td></tr>
+            </table>
+            <h2>Ventas POS</h2>
+            <table>
+              <tr><th>Cantidad</th><td>${report?.pos_sales?.count ?? 0}</td></tr>
+              <tr><th>Total</th><td>${report?.pos_sales?.total ?? 0}</td></tr>
+            </table>
+            <h2>Cuenta socio liquidada</h2>
+            <table>
+              <tr><th>Cantidad</th><td>${report?.member_account_settlements?.count ?? 0}</td></tr>
+              <tr><th>Total</th><td>${report?.member_account_settlements?.total ?? 0}</td></tr>
+            </table>
+          </body>
+        </html>
+      `;
+      const w = window.open('', '_blank', 'noopener,noreferrer');
+      if (!w) {
+        setError('El navegador bloqueó la ventana de impresión.');
+        return;
+      }
+      w.document.write(html);
+      w.document.close();
+      w.focus();
+      w.print();
+    } catch (err) {
+      setError(err?.response?.data?.message ?? 'No se pudo generar el cierre Z.');
+    }
+  };
+
   useEffect(() => {
     load();
   }, []);
@@ -427,6 +492,17 @@ ${sale.notes ? `Nota: ${sale.notes}` : ''}
 
       <div className="rounded-xl bg-white p-4 shadow-sm">
         <h3 className="mb-2 text-lg font-semibold text-slate-900">Caja POS</h3>
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <input
+            className="rounded border border-slate-300 p-2 text-sm"
+            type="date"
+            value={zCloseDate}
+            onChange={(e) => setZCloseDate(e.target.value)}
+          />
+          <button className="rounded border border-slate-300 px-2 py-1 text-sm" onClick={onPrintZClose}>
+            Imprimir Cierre Z
+          </button>
+        </div>
         <div className="mb-3 flex items-center gap-3 rounded border border-slate-200 p-2 text-sm">
           <label className="inline-flex items-center gap-2">
             <input

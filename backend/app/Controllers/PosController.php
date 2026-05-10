@@ -238,6 +238,20 @@ final class PosController
         }
     }
 
+    public function zCloseReport(): void
+    {
+        $auth = json_decode($_SERVER['auth_user'] ?? '{}', true) ?: [];
+        $date = Request::query('date', null);
+        try {
+            $data = $this->service->getDailyZCloseReport((int) $auth['tenant_id'], (int) $auth['gym_id'], $date);
+            Response::json(['success' => true, 'data' => $data]);
+        } catch (\InvalidArgumentException $e) {
+            Response::json(['success' => false, 'message' => $e->getMessage()], 422);
+        } catch (\Throwable $e) {
+            Response::json(['success' => false, 'message' => 'Failed to build POS daily Z close report'], 500);
+        }
+    }
+
     public function config(): void
     {
         $auth = json_decode($_SERVER['auth_user'] ?? '{}', true) ?: [];

@@ -576,6 +576,57 @@ final class PosService
         ];
     }
 
+    public function getDailyZCloseReport(int $tenantId, int $gymId, ?string $date): array
+    {
+        $reportDate = $this->resolveReportDate($date);
+
+        $cashSessions = $this->repo->getDailyCashSessionsSummary($tenantId, $gymId, $reportDate);
+        $paymentRows = $this->repo->getDailyPaymentsByMethod($tenantId, $gymId, $reportDate);
+        $salesSummary = $this->repo->getDailyPosSalesSummary($tenantId, $gymId, $reportDate);
+        $settlementsSummary = $this->repo->getDailySettledMemberAccountSummary($tenantId, $gymId, $reportDate);
+
+        $paymentsByMethod = [
+            'cash' => 0.0,
+            'transfer' => 0.0,
+            'mercadopago' => 0.0,
+            'card' => 0.0,
+            'other' => 0.0,
+        ];
+        foreach ($paymentRows as $row) {
+            $method = (string) ($row['method'] ?? 'other');
+            $amount = (float) ($row['total_amount'] ?? 0);
+            if (!array_key_exists($method, $paymentsByMethod)) {
+                $method = 'other';
+            }
+            $paymentsByMethod[$method] += $amount;
+        }
+        $paymentsTotal = array_sum($paymentsByMethod);
+
+        return [
+            'date' => $reportDate,
+            'cash_sessions' => [
+                'opened_count' => (int) ($cashSessions['opened_count'] ?? 0),
+                'closed_count' => (int) ($cashSessions['closed_count'] ?? 0),
+                'opening_total' => (float) ($cashSessions['opening_total'] ?? 0),
+                'expected_total' => (float) ($cashSessions['expected_total'] ?? 0),
+                'closing_total' => (float) ($cashSessions['closing_total'] ?? 0),
+                'difference_total' => (float) ($cashSessions['difference_total'] ?? 0),
+            ],
+            'payments' => [
+                'by_method' => $paymentsByMethod,
+                'total' => round((float) $paymentsTotal, 2),
+            ],
+            'pos_sales' => [
+                'count' => (int) ($salesSummary['sales_count'] ?? 0),
+                'total' => (float) ($salesSummary['sales_total'] ?? 0),
+            ],
+            'member_account_settlements' => [
+                'count' => (int) ($settlementsSummary['settled_count'] ?? 0),
+                'total' => (float) ($settlementsSummary['settled_total'] ?? 0),
+            ],
+        ];
+    }
+
     public function getPosConfig(int $tenantId, int $gymId): array
     {
         return [
@@ -609,5 +660,27 @@ final class PosService
         $gymSegment = str_pad((string) max(0, $gymId), 3, '0', STR_PAD_LEFT);
         $seqSegment = str_pad((string) max(1, $sequence), 8, '0', STR_PAD_LEFT);
         return 'POS-' . $gymSegment . '-' . $seqSegment;
+    }
+
+    private function resolveReportDate(?string $date): string
+    {
+        $raw = trim((string) ($date ?? ''));
+        if ($raw === '') {
+            return date('Y-m-d');
+        }
+
+        $dt = \DateTime::createFromFormat('Y-m-d', $raw);
+        $errors = \DateTime::getLastErrors();
+        if (
+            !$dt ||
+            !is_array($errors) ||
+            ($errors['warning_count'] ?? 0) > 0 ||
+            ($errors['error_count'] ?? 0) > 0 ||
+            $dt->format('Y-m-d') !== $raw
+        ) {
+            throw new \InvalidArgumentException('date must be in YYYY-MM-DD format');
+        }
+
+        return $raw;
     }
 }
