@@ -565,6 +565,10 @@ final class PosService
         if ($dateFrom > $dateTo) {
             throw new \InvalidArgumentException('date_from must be <= date_to');
         }
+        $rangeDays = (int) ((strtotime($dateTo . ' 00:00:00') - strtotime($dateFrom . ' 00:00:00')) / 86400) + 1;
+        if ($rangeDays > 92) {
+            throw new \InvalidArgumentException('date range must be <= 92 days');
+        }
 
         $rules = $this->resolveCollectorCommissionRules();
         $rows = $this->repo->getMemberAccountCollectorRanking($tenantId, $gymId, $dateFrom, $dateTo);

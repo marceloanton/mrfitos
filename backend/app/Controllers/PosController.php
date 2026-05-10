@@ -1558,24 +1558,53 @@ final class PosController
         ]);
 
         $rows = is_array($data['items'] ?? null) ? $data['items'] : [];
+        $totalContacts = 0;
+        $totalResponses = 0;
+        $totalSettlements = 0;
+        $totalRecovered = 0.0;
+        $totalCommission = 0.0;
         foreach ($rows as $row) {
             if (!is_array($row)) {
                 continue;
             }
+            $contactsCount = (int) ($row['contacts_count'] ?? 0);
+            $responsesCount = (int) ($row['responses_count'] ?? 0);
+            $settlementsCount = (int) ($row['settlements_count'] ?? 0);
+            $recoveredAmount = (float) ($row['recovered_amount'] ?? 0);
+            $commissionAmount = (float) ($row['commission_amount'] ?? 0);
             fputcsv($out, [
                 'ranking',
                 $this->normalizeCsvValue($row['user_id'] ?? null),
                 $this->normalizeCsvValue($row['user_name'] ?? null),
                 $this->normalizeCsvValue($row['user_email'] ?? null),
-                $this->normalizeCsvValue($row['contacts_count'] ?? null),
-                $this->normalizeCsvValue($row['responses_count'] ?? null),
+                $this->normalizeCsvValue($contactsCount),
+                $this->normalizeCsvValue($responsesCount),
                 $this->normalizeCsvValue($row['response_rate'] ?? null),
-                $this->normalizeCsvValue($row['settlements_count'] ?? null),
-                $this->normalizeCsvValue($row['recovered_amount'] ?? null),
+                $this->normalizeCsvValue($settlementsCount),
+                $this->normalizeCsvValue($recoveredAmount),
                 $this->normalizeCsvValue($row['commission_rate'] ?? null),
-                $this->normalizeCsvValue($row['commission_amount'] ?? null),
+                $this->normalizeCsvValue($commissionAmount),
             ]);
+            $totalContacts += $contactsCount;
+            $totalResponses += $responsesCount;
+            $totalSettlements += $settlementsCount;
+            $totalRecovered += $recoveredAmount;
+            $totalCommission += $commissionAmount;
         }
+        $totalResponseRate = $totalContacts > 0 ? round(($totalResponses / $totalContacts) * 100, 2) : 0.0;
+        fputcsv($out, [
+            'ranking',
+            'TOTAL',
+            '',
+            '',
+            $this->normalizeCsvValue($totalContacts),
+            $this->normalizeCsvValue($totalResponses),
+            $this->normalizeCsvValue($totalResponseRate),
+            $this->normalizeCsvValue($totalSettlements),
+            $this->normalizeCsvValue(round($totalRecovered, 2)),
+            '',
+            $this->normalizeCsvValue(round($totalCommission, 2)),
+        ]);
 
         fclose($out);
         exit;
@@ -1601,8 +1630,21 @@ final class PosController
             return $value ? '1' : '0';
         }
         if (!is_scalar($value)) {
-            return (string) json_encode($value, JSON_UNESCAPED_UNICODE);
+            $encoded = (string) json_encode($value, JSON_UNESCAPED_UNICODE);
+            return $this->sanitizeForCsvFormula($encoded);
         }
-        return (string) $value;
+        return $this->sanitizeForCsvFormula((string) $value);
+    }
+
+    private function sanitizeForCsvFormula(string $value): string
+    {
+        if ($value === '') {
+            return $value;
+        }
+        $first = $value[0];
+        if ($first === '=' || $first === '+' || $first === '-' || $first === '@') {
+            return "'" . $value;
+        }
+        return $value;
     }
 }
