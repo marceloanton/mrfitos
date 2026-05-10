@@ -118,6 +118,14 @@ export async function getMemberAccountCollectorRanking(params = {}) {
   return payload(data);
 }
 
+export async function exportMemberAccountCollectorRankingCsv(params = {}) {
+  const { data } = await api.get('/pos/member-account/collector-ranking/export', {
+    params,
+    responseType: 'blob'
+  });
+  return data;
+}
+
 export async function getMemberAccountFollowupFunnel(params = {}) {
   const { data } = await api.get('/pos/member-account/followup-funnel', { params });
   return payload(data);

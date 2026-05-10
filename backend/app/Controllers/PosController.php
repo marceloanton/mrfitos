@@ -360,6 +360,23 @@ final class PosController
         }
     }
 
+    public function memberAccountCollectorRankingExport(): void
+    {
+        $auth = json_decode($_SERVER['auth_user'] ?? '{}', true) ?: [];
+        $dateFrom = Request::query('date_from', null);
+        $dateTo = Request::query('date_to', null);
+        try {
+            $tenantId = (int) ($auth['tenant_id'] ?? 0);
+            $gymId = (int) ($auth['gym_id'] ?? 0);
+            $data = $this->service->getMemberAccountCollectorRanking($tenantId, $gymId, $dateFrom, $dateTo);
+            $this->emitMemberAccountCollectorRankingCsv($tenantId, $gymId, $data);
+        } catch (\InvalidArgumentException $e) {
+            Response::json(['success' => false, 'message' => $e->getMessage()], 422);
+        } catch (\Throwable $e) {
+            Response::json(['success' => false, 'message' => 'Failed to export collector ranking'], 500);
+        }
+    }
+
     public function createProduct(): void
     {
         $auth = json_decode($_SERVER['auth_user'] ?? '{}', true) ?: [];
@@ -1495,6 +1512,71 @@ final class PosController
         foreach ($data as $k => $v) {
             fputcsv($out, ['kpi', (string) $k, $this->normalizeCsvValue($v)]);
         }
+        fclose($out);
+        exit;
+    }
+
+    private function emitMemberAccountCollectorRankingCsv(int $tenantId, int $gymId, array $data): never
+    {
+        $dateFrom = (string) ($data['date_from'] ?? date('Y-m-d'));
+        $dateTo = (string) ($data['date_to'] ?? date('Y-m-d'));
+        $filename = 'pos-collector-ranking-' . $dateFrom . '-to-' . $dateTo . '.csv';
+        http_response_code(200);
+        header('Content-Type: text/csv; charset=utf-8');
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
+        header('Cache-Control: no-store, no-cache, must-revalidate');
+        $out = fopen('php://output', 'wb');
+        if ($out === false) {
+            Response::json(['success' => false, 'message' => 'Unable to create CSV output'], 500);
+        }
+
+        fputcsv($out, ['section', 'field', 'value']);
+        fputcsv($out, ['metadata', 'tenant_id', (string) $tenantId]);
+        fputcsv($out, ['metadata', 'gym_id', (string) $gymId]);
+        fputcsv($out, ['metadata', 'date_from', $dateFrom]);
+        fputcsv($out, ['metadata', 'date_to', $dateTo]);
+        fputcsv($out, ['', '', '']);
+
+        $rules = is_array($data['commission_rules'] ?? null) ? $data['commission_rules'] : [];
+        foreach ($rules as $k => $v) {
+            fputcsv($out, ['commission_rules', (string) $k, $this->normalizeCsvValue($v)]);
+        }
+        fputcsv($out, ['', '', '']);
+
+        fputcsv($out, [
+            'ranking',
+            'user_id',
+            'user_name',
+            'user_email',
+            'contacts_count',
+            'responses_count',
+            'response_rate',
+            'settlements_count',
+            'recovered_amount',
+            'commission_rate',
+            'commission_amount'
+        ]);
+
+        $rows = is_array($data['items'] ?? null) ? $data['items'] : [];
+        foreach ($rows as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+            fputcsv($out, [
+                'ranking',
+                $this->normalizeCsvValue($row['user_id'] ?? null),
+                $this->normalizeCsvValue($row['user_name'] ?? null),
+                $this->normalizeCsvValue($row['user_email'] ?? null),
+                $this->normalizeCsvValue($row['contacts_count'] ?? null),
+                $this->normalizeCsvValue($row['responses_count'] ?? null),
+                $this->normalizeCsvValue($row['response_rate'] ?? null),
+                $this->normalizeCsvValue($row['settlements_count'] ?? null),
+                $this->normalizeCsvValue($row['recovered_amount'] ?? null),
+                $this->normalizeCsvValue($row['commission_rate'] ?? null),
+                $this->normalizeCsvValue($row['commission_amount'] ?? null),
+            ]);
+        }
+
         fclose($out);
         exit;
     }
