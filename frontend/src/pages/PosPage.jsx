@@ -1,7 +1,16 @@
 import { useEffect, useState } from 'react';
 import { adjustStock, closeCashSession, createPosProduct, createPosSale, exportPosZCloseCsv, getCashByOperatorReport, getCashSessionReport, getOpenCashSessionSummary, getPosConfig, getPosSaleReceipt, getPosSaleReceiptByNumber, getPosSummary, getPosZCloseReport, listCashSessions, listLowStockProducts, listMemberAccountCharges, listPosProducts, listPosSales, listStockMovements, openCashSession, settleMemberAccountCharge, updatePosConfig, voidPosSale } from '../services/posService';
+import { useAuthStore } from '../stores/authStore';
 
 export default function PosPage() {
+  const hasPermission = useAuthStore((s) => s.hasPermission);
+  const canSaleCreate = hasPermission('pos.sale.create') || hasPermission('payments.write');
+  const canProductManage = hasPermission('pos.product.manage') || hasPermission('payments.write');
+  const canStockManage = hasPermission('pos.stock.manage') || hasPermission('payments.write');
+  const canCashManage = hasPermission('pos.cash.manage') || hasPermission('payments.write');
+  const canVoid = hasPermission('pos.void') || hasPermission('payments.write');
+  const canReportRead = hasPermission('pos.report.read') || hasPermission('payments.read');
+  const canReportExport = hasPermission('pos.report.export') || hasPermission('payments.read');
   const [requireOpenCash, setRequireOpenCash] = useState(true);
   const [savingConfig, setSavingConfig] = useState(false);
   const [memberId, setMemberId] = useState('');
@@ -524,7 +533,7 @@ ${sale.notes ? `Nota: ${sale.notes}` : ''}
         <input className="rounded border border-slate-300 p-2" type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
         <button
           className="rounded border border-slate-300 p-2 disabled:opacity-50"
-          disabled={loading || (requireOpenCash && !openCash)}
+          disabled={loading || !canSaleCreate || (requireOpenCash && !openCash)}
           onClick={onCreateSale}
         >
           {loading ? 'Guardando...' : 'Crear venta POS'}
@@ -542,7 +551,7 @@ ${sale.notes ? `Nota: ${sale.notes}` : ''}
         <input className="rounded border border-slate-300 p-2" placeholder="Nombre producto" value={newProduct.name} onChange={(e) => setNewProduct((s) => ({ ...s, name: e.target.value }))} />
         <input className="rounded border border-slate-300 p-2" type="number" min="0" step="0.01" placeholder="Precio" value={newProduct.price} onChange={(e) => setNewProduct((s) => ({ ...s, price: e.target.value }))} />
         <input className="rounded border border-slate-300 p-2" type="number" min="0" step="0.001" placeholder="Stock inicial" value={newProduct.stock_qty} onChange={(e) => setNewProduct((s) => ({ ...s, stock_qty: e.target.value }))} />
-        <button className="rounded border border-slate-300 p-2" onClick={onCreateProduct}>
+        <button className="rounded border border-slate-300 p-2 disabled:opacity-50" disabled={!canProductManage} onClick={onCreateProduct}>
           Crear producto POS
         </button>
       </div>
@@ -584,10 +593,10 @@ ${sale.notes ? `Nota: ${sale.notes}` : ''}
             value={zCloseDate}
             onChange={(e) => setZCloseDate(e.target.value)}
           />
-          <button className="rounded border border-slate-300 px-2 py-1 text-sm" onClick={onPrintZClose}>
+          <button className="rounded border border-slate-300 px-2 py-1 text-sm disabled:opacity-50" disabled={!canReportRead} onClick={onPrintZClose}>
             Imprimir Cierre Z
           </button>
-          <button className="rounded border border-slate-300 px-2 py-1 text-sm" onClick={onExportZCloseCsv}>
+          <button className="rounded border border-slate-300 px-2 py-1 text-sm disabled:opacity-50" disabled={!canReportExport} onClick={onExportZCloseCsv}>
             Exportar CSV Z
           </button>
         </div>
@@ -596,7 +605,8 @@ ${sale.notes ? `Nota: ${sale.notes}` : ''}
             <input
               type="checkbox"
               checked={requireOpenCash}
-              disabled={savingConfig}
+              aria-disabled={!canCashManage}
+              disabled={savingConfig || !canCashManage}
               onChange={(e) => onToggleRequireOpenCash(e.target.checked)}
             />
             Requerir caja abierta para vender
@@ -618,7 +628,7 @@ ${sale.notes ? `Nota: ${sale.notes}` : ''}
                 value={closingAmount}
                 onChange={(e) => setClosingAmount(e.target.value)}
               />
-              <button className="rounded border border-slate-300 px-3 py-2" onClick={onCloseCash}>
+              <button className="rounded border border-slate-300 px-3 py-2 disabled:opacity-50" disabled={!canCashManage} onClick={onCloseCash}>
                 Cerrar caja
               </button>
             </div>
@@ -634,7 +644,7 @@ ${sale.notes ? `Nota: ${sale.notes}` : ''}
               value={openingAmount}
               onChange={(e) => setOpeningAmount(e.target.value)}
             />
-            <button className="rounded border border-slate-300 px-3 py-2" onClick={onOpenCash}>
+            <button className="rounded border border-slate-300 px-3 py-2 disabled:opacity-50" disabled={!canCashManage} onClick={onOpenCash}>
               Abrir caja
             </button>
           </div>
@@ -674,7 +684,7 @@ ${sale.notes ? `Nota: ${sale.notes}` : ''}
           value={stockMovement.notes}
           onChange={(e) => setStockMovement((s) => ({ ...s, notes: e.target.value }))}
         />
-        <button className="rounded border border-slate-300 p-2" onClick={onAdjustStock}>
+        <button className="rounded border border-slate-300 p-2 disabled:opacity-50" disabled={!canStockManage} onClick={onAdjustStock}>
           Registrar movimiento
         </button>
       </div>
@@ -690,7 +700,7 @@ ${sale.notes ? `Nota: ${sale.notes}` : ''}
           ) : charges.map((c) => (
             <div key={c.id} className="flex items-center justify-between rounded border border-slate-200 p-2 text-sm">
               <span>#{c.id} · Socio {c.member_code} · {c.amount} {c.currency}</span>
-              <button className="rounded border border-slate-300 px-2 py-1" onClick={() => onSettle(c.id)}>
+              <button className="rounded border border-slate-300 px-2 py-1 disabled:opacity-50" disabled={!canSaleCreate} onClick={() => onSettle(c.id)}>
                 Cobrar por débito automático
               </button>
             </div>
@@ -721,13 +731,13 @@ ${sale.notes ? `Nota: ${sale.notes}` : ''}
             <div key={s.id} className="flex items-center justify-between gap-2 rounded border border-slate-200 p-2 text-sm">
               <span>{s.receipt_number ?? `#${s.id}`} · {s.total_amount} {s.currency} · {s.charge_mode} · {s.member_code ? `${s.member_code} ${s.first_name} ${s.last_name}` : 'sin socio'}</span>
               <div className="flex gap-1">
-                <button className="rounded border border-slate-300 px-2 py-1" onClick={() => onPrintSaleTicket(s.id, '58')}>
+                <button className="rounded border border-slate-300 px-2 py-1 disabled:opacity-50" disabled={!canReportRead} onClick={() => onPrintSaleTicket(s.id, '58')}>
                   Ticket 58mm
                 </button>
-                <button className="rounded border border-slate-300 px-2 py-1" onClick={() => onPrintSaleTicket(s.id, '80')}>
+                <button className="rounded border border-slate-300 px-2 py-1 disabled:opacity-50" disabled={!canReportRead} onClick={() => onPrintSaleTicket(s.id, '80')}>
                   Ticket 80mm
                 </button>
-                <button className="rounded border border-red-300 px-2 py-1 text-red-700" onClick={() => onVoidSale(s)}>
+                <button className="rounded border border-red-300 px-2 py-1 text-red-700 disabled:opacity-50" disabled={!canVoid} onClick={() => onVoidSale(s)}>
                   Anular
                 </button>
               </div>

@@ -11,6 +11,7 @@ export default function AppLayout() {
   const switchingGym = useAuthStore((state) => state.switchingGym);
   const user = useAuthStore((state) => state.user);
   const hasPermission = useAuthStore((state) => state.hasPermission);
+  const canPosRead = hasPermission('pos.read') || hasPermission('payments.read');
   const token = useAuthStore((state) => state.token);
   const availableGyms = Array.isArray(user?.available_gyms) ? user.available_gyms : [];
   const [riskBanner, setRiskBanner] = useState(null);
@@ -55,7 +56,7 @@ export default function AppLayout() {
             {hasPermission('plans.read') && <NavLink to="/plans" className="rounded px-3 py-2 text-sm hover:bg-slate-100">Planes</NavLink>}
             {hasPermission('memberships.read') && <NavLink to="/memberships" className="rounded px-3 py-2 text-sm hover:bg-slate-100">Membresias</NavLink>}
             {hasPermission('payments.read') && <NavLink to="/payments" className="rounded px-3 py-2 text-sm hover:bg-slate-100">Pagos</NavLink>}
-            {hasPermission('payments.read') && <NavLink to="/pos" className="rounded px-3 py-2 text-sm hover:bg-slate-100">POS</NavLink>}
+            {canPosRead && <NavLink to="/pos" className="rounded px-3 py-2 text-sm hover:bg-slate-100">POS</NavLink>}
             {hasPermission('attendance.read') && <NavLink to="/attendance" className="rounded px-3 py-2 text-sm hover:bg-slate-100">Asistencia</NavLink>}
             {hasPermission('whatsapp.read') && <NavLink to="/reminders" className="rounded px-3 py-2 text-sm hover:bg-slate-100">WhatsApp</NavLink>}
             {hasPermission('reports.read') && <NavLink to="/reports" className="rounded px-3 py-2 text-sm hover:bg-slate-100">Reportes</NavLink>}

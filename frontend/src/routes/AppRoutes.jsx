@@ -43,9 +43,11 @@ export default function AppRoutes() {
           <Route element={<PermissionRoute permission="memberships.read" />}>
             <Route path="/memberships" element={<MembershipsPage />} />
           </Route>
+          <Route element={<PermissionRoute permissions={['pos.read', 'payments.read']} />}>
+            <Route path="/pos" element={<PosPage />} />
+          </Route>
           <Route element={<PermissionRoute permission="payments.read" />}>
             <Route path="/payments" element={<PaymentsPage />} />
-            <Route path="/pos" element={<PosPage />} />
           </Route>
           <Route element={<PermissionRoute permission="attendance.read" />}>
             <Route path="/attendance" element={<AttendancePage />} />
