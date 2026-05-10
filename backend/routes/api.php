@@ -127,6 +127,7 @@ $router->add('POST', '/pos/sales/{id}/void', [PosController::class, 'voidSale'],
 $router->add('GET', '/pos/member-account/charges', [PosController::class, 'memberAccountCharges'], [AuthMiddleware::class, TenantMiddleware::class, new PermissionMiddleware('pos.read')]);
 $router->add('GET', '/pos/member-account/aging', [PosController::class, 'memberAccountAging'], [AuthMiddleware::class, TenantMiddleware::class, new PermissionMiddleware('pos.report.read')]);
 $router->add('GET', '/pos/member-account/collections-kpi-today', [PosController::class, 'memberAccountCollectionsKpiToday'], [AuthMiddleware::class, TenantMiddleware::class, new PermissionMiddleware('pos.report.read')]);
+$router->add('GET', '/pos/member-account/contact-effectiveness-today', [PosController::class, 'memberAccountContactEffectivenessToday'], [AuthMiddleware::class, TenantMiddleware::class, new PermissionMiddleware('pos.report.read')]);
 $router->add('GET', '/pos/member-account/followup-funnel', [PosController::class, 'memberAccountFollowupFunnelWeekly'], [AuthMiddleware::class, TenantMiddleware::class, new PermissionMiddleware('pos.report.read')]);
 $router->add('GET', '/pos/member-account/promise-agenda', [PosController::class, 'memberAccountPromiseAgenda'], [AuthMiddleware::class, TenantMiddleware::class, new PermissionMiddleware('pos.report.read')]);
 $router->add('GET', '/pos/member-account/promise-agenda/export', [PosController::class, 'memberAccountPromiseAgendaExport'], [AuthMiddleware::class, TenantMiddleware::class, new PermissionMiddleware('pos.report.export')]);
@@ -135,6 +136,7 @@ $router->add('GET', '/pos/member-account/promise-agenda/overdue-whatsapp-links',
 $router->add('GET', '/pos/member-account/promise-agenda/overdue-whatsapp-links/export', [PosController::class, 'memberAccountPromiseAgendaOverdueWhatsAppLinksExport'], [AuthMiddleware::class, TenantMiddleware::class, new PermissionMiddleware('pos.report.export')]);
 $router->add('GET', '/pos/member-account/aging/whatsapp-link', [PosController::class, 'memberAccountOverdueWhatsAppLink'], [AuthMiddleware::class, TenantMiddleware::class, new PermissionMiddleware('whatsapp.send')]);
 $router->add('POST', '/pos/member-account/followup', [PosController::class, 'memberAccountFollowupUpsert'], [AuthMiddleware::class, TenantMiddleware::class, new PermissionMiddleware('pos.sale.create')]);
+$router->add('POST', '/pos/member-account/followup/contact-result', [PosController::class, 'memberAccountFollowupContactResult'], [AuthMiddleware::class, TenantMiddleware::class, new PermissionMiddleware('pos.sale.create')]);
 $router->add('POST', '/pos/member-account/charges/{id}/settle', [PosController::class, 'settleMemberAccountCharge'], [AuthMiddleware::class, TenantMiddleware::class, new PermissionMiddleware('pos.sale.create')]);
 $router->add('POST', '/pos/member-account/auto-settle', [PosController::class, 'autoSettleMemberAccount'], [AuthMiddleware::class, TenantMiddleware::class, new PermissionMiddleware('pos.sale.create')]);
 $router->add('GET', '/pos/stock/movements', [PosController::class, 'stockMovements'], [AuthMiddleware::class, TenantMiddleware::class, new PermissionMiddleware('pos.read')]);

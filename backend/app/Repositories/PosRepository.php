@@ -1829,13 +1829,15 @@ final class PosRepository
     {
         $stmt = Database::connection()->prepare(
             'INSERT INTO member_account_followups
-             (tenant_id, gym_id, member_id, status, promise_date, notes, created_by_user_id, updated_by_user_id, created_at, updated_at)
+             (tenant_id, gym_id, member_id, status, promise_date, notes, last_contact_result, last_contact_at, created_by_user_id, updated_by_user_id, created_at, updated_at)
              VALUES
-             (:tenant_id, :gym_id, :member_id, :status, :promise_date, :notes, :created_by_user_id, :updated_by_user_id, NOW(), NOW())
+             (:tenant_id, :gym_id, :member_id, :status, :promise_date, :notes, :last_contact_result, :last_contact_at, :created_by_user_id, :updated_by_user_id, NOW(), NOW())
              ON DUPLICATE KEY UPDATE
                 status = VALUES(status),
                 promise_date = VALUES(promise_date),
                 notes = VALUES(notes),
+                last_contact_result = VALUES(last_contact_result),
+                last_contact_at = VALUES(last_contact_at),
                 updated_by_user_id = VALUES(updated_by_user_id),
                 updated_at = NOW()'
         );
@@ -1853,7 +1855,7 @@ final class PosRepository
             return [];
         }
         $placeholders = implode(',', array_fill(0, count($memberIds), '?'));
-        $sql = "SELECT member_id, status, promise_date, notes, updated_at
+        $sql = "SELECT member_id, status, promise_date, notes, last_contact_result, last_contact_at, updated_at
                 FROM member_account_followups
                 WHERE tenant_id = ?
                   AND gym_id = ?
@@ -2005,5 +2007,47 @@ final class PosRepository
         $stmt->bindValue(':limit', $limit, \PDO::PARAM_INT);
         $stmt->execute();
         return $stmt->fetchAll() ?: [];
+    }
+
+    public function updateFollowupContactResult(int $tenantId, int $gymId, int $memberId, string $result, ?int $updatedByUserId): bool
+    {
+        $stmt = Database::connection()->prepare(
+            'UPDATE member_account_followups
+             SET last_contact_result = :result,
+                 last_contact_at = NOW(),
+                 updated_by_user_id = :updated_by_user_id,
+                 updated_at = NOW()
+             WHERE tenant_id = :tenant_id
+               AND gym_id = :gym_id
+               AND member_id = :member_id'
+        );
+        $stmt->execute([
+            'result' => $result,
+            'updated_by_user_id' => $updatedByUserId,
+            'tenant_id' => $tenantId,
+            'gym_id' => $gymId,
+            'member_id' => $memberId,
+        ]);
+        return $stmt->rowCount() > 0;
+    }
+
+    public function getFollowupContactEffectivenessToday(int $tenantId, int $gymId): array
+    {
+        $stmt = Database::connection()->prepare(
+            'SELECT
+                COALESCE(SUM(CASE WHEN last_contact_result IS NOT NULL AND DATE(last_contact_at) = CURDATE() THEN 1 ELSE 0 END), 0) AS touched_today_count,
+                COALESCE(SUM(CASE WHEN last_contact_result = "responded" AND DATE(last_contact_at) = CURDATE() THEN 1 ELSE 0 END), 0) AS responded_count,
+                COALESCE(SUM(CASE WHEN last_contact_result = "no_response" AND DATE(last_contact_at) = CURDATE() THEN 1 ELSE 0 END), 0) AS no_response_count,
+                COALESCE(SUM(CASE WHEN last_contact_result = "wrong_number" AND DATE(last_contact_at) = CURDATE() THEN 1 ELSE 0 END), 0) AS wrong_number_count,
+                COALESCE(SUM(CASE WHEN last_contact_result = "promise_confirmed" AND DATE(last_contact_at) = CURDATE() THEN 1 ELSE 0 END), 0) AS promise_confirmed_count
+             FROM member_account_followups
+             WHERE tenant_id = :tenant_id
+               AND gym_id = :gym_id'
+        );
+        $stmt->execute([
+            'tenant_id' => $tenantId,
+            'gym_id' => $gymId,
+        ]);
+        return $stmt->fetch() ?: [];
     }
 }

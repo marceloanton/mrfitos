@@ -164,6 +164,24 @@ final class PosController
         }
     }
 
+    public function memberAccountFollowupContactResult(): void
+    {
+        $auth = json_decode($_SERVER['auth_user'] ?? '{}', true) ?: [];
+        try {
+            $data = $this->service->updateMemberAccountFollowupContactResult(
+                (int) ($auth['tenant_id'] ?? 0),
+                (int) ($auth['gym_id'] ?? 0),
+                (int) ($auth['sub'] ?? 0),
+                Request::json()
+            );
+            Response::json(['success' => true, 'data' => $data]);
+        } catch (\InvalidArgumentException $e) {
+            Response::json(['success' => false, 'message' => $e->getMessage()], 422);
+        } catch (\Throwable $e) {
+            Response::json(['success' => false, 'message' => 'Failed to update contact result'], 500);
+        }
+    }
+
     public function memberAccountFollowupFunnelWeekly(): void
     {
         $auth = json_decode($_SERVER['auth_user'] ?? '{}', true) ?: [];
@@ -266,6 +284,22 @@ final class PosController
             Response::json(['success' => false, 'message' => $e->getMessage()], 422);
         } catch (\Throwable $e) {
             Response::json(['success' => false, 'message' => 'Failed to export overdue promise WhatsApp links'], 500);
+        }
+    }
+
+    public function memberAccountContactEffectivenessToday(): void
+    {
+        $auth = json_decode($_SERVER['auth_user'] ?? '{}', true) ?: [];
+        try {
+            $data = $this->service->getMemberAccountContactEffectivenessToday(
+                (int) ($auth['tenant_id'] ?? 0),
+                (int) ($auth['gym_id'] ?? 0)
+            );
+            Response::json(['success' => true, 'data' => $data]);
+        } catch (\InvalidArgumentException $e) {
+            Response::json(['success' => false, 'message' => $e->getMessage()], 422);
+        } catch (\Throwable $e) {
+            Response::json(['success' => false, 'message' => 'Failed to fetch contact effectiveness KPI'], 500);
         }
     }
 

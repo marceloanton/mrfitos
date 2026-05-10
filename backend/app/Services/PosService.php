@@ -139,6 +139,8 @@ final class PosService
                 'status' => (string) ($f['status'] ?? ''),
                 'promise_date' => (string) ($f['promise_date'] ?? ''),
                 'notes' => (string) ($f['notes'] ?? ''),
+                'last_contact_result' => (string) ($f['last_contact_result'] ?? ''),
+                'last_contact_at' => (string) ($f['last_contact_at'] ?? ''),
                 'updated_at' => (string) ($f['updated_at'] ?? ''),
             ];
         }
@@ -207,6 +209,7 @@ final class PosService
         $status = strtolower(trim((string) ($input['status'] ?? '')));
         $promiseDate = trim((string) ($input['promise_date'] ?? ''));
         $notes = trim((string) ($input['notes'] ?? ''));
+        $contactResult = strtolower(trim((string) ($input['last_contact_result'] ?? '')));
 
         if ($memberId <= 0) {
             throw new \InvalidArgumentException('member_id is required');
@@ -222,6 +225,10 @@ final class PosService
         } else {
             $promiseDate = null;
         }
+        if ($contactResult !== '' && !in_array($contactResult, ['responded', 'no_response', 'wrong_number', 'promise_confirmed'], true)) {
+            throw new \InvalidArgumentException('Invalid last_contact_result');
+        }
+        $contactAt = $contactResult !== '' ? date('Y-m-d H:i:s') : null;
 
         $this->repo->upsertMemberAccountFollowup([
             'tenant_id' => $tenantId,
@@ -230,6 +237,8 @@ final class PosService
             'status' => $status,
             'promise_date' => $promiseDate,
             'notes' => $notes !== '' ? substr($notes, 0, 255) : null,
+            'last_contact_result' => $contactResult !== '' ? $contactResult : null,
+            'last_contact_at' => $contactAt,
             'created_by_user_id' => $userId > 0 ? $userId : null,
             'updated_by_user_id' => $userId > 0 ? $userId : null,
         ]);
@@ -246,6 +255,7 @@ final class PosService
                 'status' => $status,
                 'promise_date' => $promiseDate,
                 'notes' => $notes,
+                'last_contact_result' => $contactResult !== '' ? $contactResult : null,
             ],
             'ip_address' => $_SERVER['REMOTE_ADDR'] ?? null,
             'user_agent' => $_SERVER['HTTP_USER_AGENT'] ?? null,
@@ -256,7 +266,36 @@ final class PosService
             'status' => $status,
             'promise_date' => $promiseDate,
             'notes' => $notes,
+            'last_contact_result' => $contactResult !== '' ? $contactResult : null,
         ];
+    }
+
+    public function updateMemberAccountFollowupContactResult(int $tenantId, int $gymId, int $userId, array $input): array
+    {
+        $memberId = (int) ($input['member_id'] ?? 0);
+        $result = strtolower(trim((string) ($input['result'] ?? '')));
+        if ($memberId <= 0) {
+            throw new \InvalidArgumentException('member_id is required');
+        }
+        if (!in_array($result, ['responded', 'no_response', 'wrong_number', 'promise_confirmed'], true)) {
+            throw new \InvalidArgumentException('Invalid result');
+        }
+        $updated = $this->repo->updateFollowupContactResult($tenantId, $gymId, $memberId, $result, $userId > 0 ? $userId : null);
+        if (!$updated) {
+            throw new \InvalidArgumentException('Followup not found for member');
+        }
+        $this->activity->create([
+            'tenant_id' => $tenantId,
+            'gym_id' => $gymId,
+            'user_id' => $userId > 0 ? $userId : null,
+            'entity_type' => 'member',
+            'entity_id' => $memberId,
+            'action' => 'pos_member_account_contact_result_updated',
+            'metadata' => ['member_id' => $memberId, 'result' => $result],
+            'ip_address' => $_SERVER['REMOTE_ADDR'] ?? null,
+            'user_agent' => $_SERVER['HTTP_USER_AGENT'] ?? null,
+        ]);
+        return ['member_id' => $memberId, 'result' => $result, 'updated' => true];
     }
 
     public function getMemberAccountFollowupFunnelWeekly(int $tenantId, int $gymId, mixed $dateFromInput, mixed $dateToInput): array
@@ -458,6 +497,19 @@ final class PosService
             'contacted_today_unique_members' => (int) ($row['contacted_today_unique_members'] ?? 0),
             'recovered_today_count' => (int) ($row['recovered_today_count'] ?? 0),
             'recovered_today_amount' => (float) ($row['recovered_today_amount'] ?? 0),
+        ];
+    }
+
+    public function getMemberAccountContactEffectivenessToday(int $tenantId, int $gymId): array
+    {
+        $row = $this->repo->getFollowupContactEffectivenessToday($tenantId, $gymId);
+        return [
+            'date' => date('Y-m-d'),
+            'touched_today_count' => (int) ($row['touched_today_count'] ?? 0),
+            'responded_count' => (int) ($row['responded_count'] ?? 0),
+            'no_response_count' => (int) ($row['no_response_count'] ?? 0),
+            'wrong_number_count' => (int) ($row['wrong_number_count'] ?? 0),
+            'promise_confirmed_count' => (int) ($row['promise_confirmed_count'] ?? 0),
         ];
     }
 
