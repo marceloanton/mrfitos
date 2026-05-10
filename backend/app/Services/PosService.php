@@ -176,11 +176,57 @@ final class PosService
                 'member_code' => (string) ($row['member_code'] ?? ''),
                 'first_name' => (string) ($row['first_name'] ?? ''),
                 'last_name' => (string) ($row['last_name'] ?? ''),
+                'phone' => (string) ($row['phone'] ?? ''),
                 'charges_count' => (int) ($row['charges_count'] ?? 0),
                 'total_amount' => (float) ($row['total_amount'] ?? 0),
                 'oldest_due_date' => (string) ($row['oldest_due_date'] ?? ''),
                 'max_days_overdue' => (int) ($row['max_days_overdue'] ?? 0),
             ], $topMembers),
+        ];
+    }
+
+    public function buildMemberOverdueWhatsAppLink(int $tenantId, int $gymId, int $memberId): array
+    {
+        if ($memberId <= 0) {
+            throw new \InvalidArgumentException('member_id is required');
+        }
+
+        $row = $this->repo->findMemberOverdueSummary($tenantId, $gymId, $memberId);
+        if (!$row) {
+            throw new \InvalidArgumentException('Member not found');
+        }
+
+        $phoneNormalized = $this->normalizePhoneDigits((string) ($row['phone'] ?? ''));
+        if ($phoneNormalized === null) {
+            throw new \InvalidArgumentException('Member has no valid phone');
+        }
+
+        $chargesCount = (int) ($row['charges_count'] ?? 0);
+        $totalAmount = (float) ($row['total_amount'] ?? 0);
+        $maxDaysOverdue = (int) ($row['max_days_overdue'] ?? 0);
+        if ($chargesCount <= 0 || $totalAmount <= 0) {
+            throw new \InvalidArgumentException('Member has no overdue balance');
+        }
+
+        $memberName = trim((string) ($row['first_name'] ?? '') . ' ' . (string) ($row['last_name'] ?? ''));
+        $text = sprintf(
+            'Hola %s, te contactamos de tu gimnasio por un saldo pendiente de $%.2f (%d cargos, %d dias maximo de atraso). Responde este mensaje para ayudarte a regularizarlo.',
+            $memberName !== '' ? $memberName : 'socio/a',
+            $totalAmount,
+            $chargesCount,
+            $maxDaysOverdue
+        );
+
+        return [
+            'member_id' => (int) ($row['member_id'] ?? 0),
+            'member_code' => (string) ($row['member_code'] ?? ''),
+            'member_name' => $memberName,
+            'phone_normalized' => $phoneNormalized,
+            'overdue_charges_count' => $chargesCount,
+            'overdue_total_amount' => $totalAmount,
+            'max_days_overdue' => $maxDaysOverdue,
+            'message_text' => $text,
+            'whatsapp_link' => 'https://wa.me/' . $phoneNormalized . '?text=' . rawurlencode($text),
         ];
     }
 

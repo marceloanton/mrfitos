@@ -83,6 +83,13 @@ export async function getMemberAccountAging() {
   return payload(data);
 }
 
+export async function getMemberAccountOverdueWhatsAppLink(memberId) {
+  const { data } = await api.get('/pos/member-account/aging/whatsapp-link', {
+    params: { member_id: memberId }
+  });
+  return payload(data);
+}
+
 export async function settleMemberAccountCharge(id, body = {}) {
   const { data } = await api.post(`/pos/member-account/charges/${id}/settle`, body);
   return payload(data);

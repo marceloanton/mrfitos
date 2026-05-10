@@ -1739,6 +1739,7 @@ final class PosRepository
                 m.member_code,
                 m.first_name,
                 m.last_name,
+                m.phone,
                 COUNT(*) AS charges_count,
                 COALESCE(SUM(c.amount), 0) AS total_amount,
                 MIN(c.due_date) AS oldest_due_date,
@@ -1750,7 +1751,7 @@ final class PosRepository
                AND c.status = "pending_auto_debit"
                AND c.due_date IS NOT NULL
                AND c.due_date <= CURDATE()
-             GROUP BY c.member_id, m.member_code, m.first_name, m.last_name
+             GROUP BY c.member_id, m.member_code, m.first_name, m.last_name, m.phone
              ORDER BY total_amount DESC, max_days_overdue DESC
              LIMIT :limit'
         );
@@ -1759,5 +1760,41 @@ final class PosRepository
         $stmt->bindValue(':limit', $limit, \PDO::PARAM_INT);
         $stmt->execute();
         return $stmt->fetchAll() ?: [];
+    }
+
+    public function findMemberOverdueSummary(int $tenantId, int $gymId, int $memberId): ?array
+    {
+        $stmt = Database::connection()->prepare(
+            'SELECT
+                m.id AS member_id,
+                m.member_code,
+                m.first_name,
+                m.last_name,
+                m.phone,
+                COUNT(c.id) AS charges_count,
+                COALESCE(SUM(c.amount), 0) AS total_amount,
+                MAX(DATEDIFF(CURDATE(), c.due_date)) AS max_days_overdue
+             FROM members m
+             LEFT JOIN member_account_charges c
+               ON c.member_id = m.id
+              AND c.tenant_id = m.tenant_id
+              AND c.gym_id = m.gym_id
+              AND c.status = "pending_auto_debit"
+              AND c.due_date IS NOT NULL
+              AND c.due_date <= CURDATE()
+             WHERE m.id = :member_id
+               AND m.tenant_id = :tenant_id
+               AND m.gym_id = :gym_id
+               AND m.deleted_at IS NULL
+             GROUP BY m.id, m.member_code, m.first_name, m.last_name, m.phone
+             LIMIT 1'
+        );
+        $stmt->execute([
+            'member_id' => $memberId,
+            'tenant_id' => $tenantId,
+            'gym_id' => $gymId,
+        ]);
+        $row = $stmt->fetch();
+        return $row ?: null;
     }
 }

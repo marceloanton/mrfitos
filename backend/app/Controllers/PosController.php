@@ -111,6 +111,24 @@ final class PosController
         }
     }
 
+    public function memberAccountOverdueWhatsAppLink(): void
+    {
+        $auth = json_decode($_SERVER['auth_user'] ?? '{}', true) ?: [];
+        $memberId = (int) Request::query('member_id', 0);
+        try {
+            $data = $this->service->buildMemberOverdueWhatsAppLink(
+                (int) ($auth['tenant_id'] ?? 0),
+                (int) ($auth['gym_id'] ?? 0),
+                $memberId
+            );
+            Response::json(['success' => true, 'data' => $data]);
+        } catch (\InvalidArgumentException $e) {
+            Response::json(['success' => false, 'message' => $e->getMessage()], 422);
+        } catch (\Throwable $e) {
+            Response::json(['success' => false, 'message' => 'Failed to build overdue WhatsApp link'], 500);
+        }
+    }
+
     public function createProduct(): void
     {
         $auth = json_decode($_SERVER['auth_user'] ?? '{}', true) ?: [];

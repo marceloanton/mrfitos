@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { adjustStock, autoSettleMemberAccountCharges, closeCashSession, createPosAlertContact, createPosProduct, createPosSale, deletePosAlertContact, exportPosAlertDispatchHistoryCsv, exportPosAuditCsv, exportPosAutosettleKpiCsv, exportPosZCloseCsv, getCashByOperatorReport, getCashSessionReport, getMemberAccountAging, getOpenCashSessionSummary, getPosAlertNotifyLink, getPosAlerts, getPosAlertsStatus, getPosAutosettleKpi, getPosConfig, getPosSaleReceipt, getPosSaleReceiptByNumber, getPosSummary, getPosZCloseReport, listCashSessions, listLowStockProducts, listMemberAccountCharges, listPosAlertContacts, listPosAlertDispatchHistory, listPosAlertsCronHistory, listPosAudit, listPosProducts, listPosSales, listStockMovements, notifyCriticalPosAlert, openCashSession, settleMemberAccountCharge, updatePosAlertContact, updatePosConfig, voidPosSale } from '../services/posService';
+import { adjustStock, autoSettleMemberAccountCharges, closeCashSession, createPosAlertContact, createPosProduct, createPosSale, deletePosAlertContact, exportPosAlertDispatchHistoryCsv, exportPosAuditCsv, exportPosAutosettleKpiCsv, exportPosZCloseCsv, getCashByOperatorReport, getCashSessionReport, getMemberAccountAging, getMemberAccountOverdueWhatsAppLink, getOpenCashSessionSummary, getPosAlertNotifyLink, getPosAlerts, getPosAlertsStatus, getPosAutosettleKpi, getPosConfig, getPosSaleReceipt, getPosSaleReceiptByNumber, getPosSummary, getPosZCloseReport, listCashSessions, listLowStockProducts, listMemberAccountCharges, listPosAlertContacts, listPosAlertDispatchHistory, listPosAlertsCronHistory, listPosAudit, listPosProducts, listPosSales, listStockMovements, notifyCriticalPosAlert, openCashSession, settleMemberAccountCharge, updatePosAlertContact, updatePosConfig, voidPosSale } from '../services/posService';
 import { useAuthStore } from '../stores/authStore';
 
 export default function PosPage() {
@@ -675,6 +675,20 @@ ${sale.notes ? `Nota: ${sale.notes}` : ''}
     }
   };
 
+  const onOpenOverdueWhatsApp = async (memberId) => {
+    setError('');
+    try {
+      const data = await getMemberAccountOverdueWhatsAppLink(memberId);
+      if (data?.whatsapp_link) {
+        window.open(data.whatsapp_link, '_blank', 'noopener,noreferrer');
+      } else {
+        setError('No se pudo generar el link de WhatsApp para ese socio.');
+      }
+    } catch (err) {
+      setError(err?.response?.data?.message ?? 'No se pudo generar link de WhatsApp.');
+    }
+  };
+
   const onCreateProduct = async () => {
     setError('');
     setMessage('');
@@ -743,7 +757,16 @@ ${sale.notes ? `Nota: ${sale.notes}` : ''}
           ) : memberAccountAging.top_overdue_members.map((m) => (
             <div key={m.member_id} className="flex items-center justify-between rounded border border-slate-200 p-2 text-sm">
               <span>{m.member_code} · {m.first_name} {m.last_name} · {m.charges_count} cargos</span>
-              <span className="font-semibold text-slate-900">${Number(m.total_amount || 0).toFixed(2)} · {m.max_days_overdue} días</span>
+              <div className="flex items-center gap-2">
+                <span className="font-semibold text-slate-900">${Number(m.total_amount || 0).toFixed(2)} · {m.max_days_overdue} días</span>
+                <button
+                  className="rounded border border-emerald-300 px-2 py-1 text-xs text-emerald-700 disabled:opacity-50"
+                  disabled={!hasPermission('whatsapp.send')}
+                  onClick={() => onOpenOverdueWhatsApp(m.member_id)}
+                >
+                  WhatsApp
+                </button>
+              </div>
             </div>
           ))}
         </div>
