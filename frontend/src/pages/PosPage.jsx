@@ -155,12 +155,20 @@ export default function PosPage() {
     const rangeDays = Math.floor((toTime - fromTime) / 86400000) + 1;
     return rangeDays <= 92;
   };
+  const isFollowupRangeOrderValid = !followupDateFrom || !followupDateTo || followupDateFrom <= followupDateTo;
+  const isFollowupRangeLengthValid = isRangeWithin92Days(followupDateFrom, followupDateTo);
+  const isFollowupRangeValid = isFollowupRangeOrderValid && isFollowupRangeLengthValid;
+  const followupRangeValidationMessage = !isFollowupRangeOrderValid
+    ? 'La fecha desde no puede ser mayor a la fecha hasta.'
+    : !isFollowupRangeLengthValid
+      ? 'El rango de fechas no puede superar 92 días.'
+      : '';
   const validateFollowupRange = () => {
-    if (followupDateFrom && followupDateTo && followupDateFrom > followupDateTo) {
+    if (!isFollowupRangeOrderValid) {
       setError('La fecha desde no puede ser mayor a la fecha hasta.');
       return false;
     }
-    if (!isRangeWithin92Days(followupDateFrom, followupDateTo)) {
+    if (!isFollowupRangeLengthValid) {
       setError('El rango de fechas no puede superar 92 días.');
       return false;
     }
@@ -1068,10 +1076,13 @@ ${sale.notes ? `Nota: ${sale.notes}` : ''}
           <button className="rounded border border-slate-300 px-2 py-2 text-xs" onClick={() => applyFollowupRangePreset(90)}>
             90d
           </button>
-          <button className="rounded border border-slate-300 px-3 py-2 text-sm" onClick={load}>
+          <button className="rounded border border-slate-300 px-3 py-2 text-sm disabled:opacity-50" disabled={!isFollowupRangeValid} onClick={load}>
             Actualizar Embudo
           </button>
         </div>
+        {followupRangeValidationMessage && (
+          <p className="mb-2 text-xs text-red-600">{followupRangeValidationMessage}</p>
+        )}
         <div className="mb-3 grid gap-2 md:grid-cols-3">
           <div className="rounded border border-slate-200 p-2">
             <p className="text-xs uppercase tracking-wide text-slate-500">Contactado</p>
@@ -1152,10 +1163,10 @@ ${sale.notes ? `Nota: ${sale.notes}` : ''}
           <button className="mr-2 rounded border border-emerald-300 px-3 py-2 text-sm text-emerald-700 disabled:opacity-50" disabled={!canReportExport} onClick={onExportOverduePromiseWhatsAppCsv}>
             Exportar Links WhatsApp
           </button>
-          <button className="mr-2 rounded border border-slate-300 px-3 py-2 text-sm disabled:opacity-50" disabled={!canReportExport} onClick={onExportContactEffectivenessCsv}>
+          <button className="mr-2 rounded border border-slate-300 px-3 py-2 text-sm disabled:opacity-50" disabled={!canReportExport || !isFollowupRangeValid} onClick={onExportContactEffectivenessCsv}>
             Exportar Efectividad CSV
           </button>
-          <button className="mr-2 rounded border border-slate-300 px-3 py-2 text-sm disabled:opacity-50" disabled={!canReportExport} onClick={onExportCollectorRankingCsv}>
+          <button className="mr-2 rounded border border-slate-300 px-3 py-2 text-sm disabled:opacity-50" disabled={!canReportExport || !isFollowupRangeValid} onClick={onExportCollectorRankingCsv}>
             Exportar Ranking CSV
           </button>
           <button className="rounded border border-slate-300 px-3 py-2 text-sm disabled:opacity-50" disabled={!canReportExport} onClick={onExportPromiseAgendaCsv}>
