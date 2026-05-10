@@ -173,6 +173,12 @@ export default function PosPage() {
     setError('');
   };
   const collectorLeadLabel = collectorRankingSortDir === 'asc' ? 'Primer cobrador' : 'Top cobrador';
+  const collectorSortMetricLabel = collectorRankingSortBy === 'response_rate'
+    ? 'tasa de respuesta'
+    : collectorRankingSortBy === 'contacts_count'
+      ? 'contactos'
+      : 'monto recuperado';
+  const collectorSortDirectionLabel = collectorRankingSortDir === 'asc' ? 'menor a mayor' : 'mayor a menor';
 
   const load = async () => {
     if (!validateFollowupRange()) {
@@ -1088,6 +1094,9 @@ ${sale.notes ? `Nota: ${sale.notes}` : ''}
         </div>
         <div className="mb-3 rounded border border-slate-200 p-2">
           <p className="mb-2 text-sm font-medium text-slate-700">Ranking de cobradores</p>
+          <p className="mb-2 text-xs text-slate-500">
+            Orden actual: {collectorSortMetricLabel} ({collectorSortDirectionLabel}).
+          </p>
           <div className="mb-2 grid gap-2 md:grid-cols-4">
             <div className="rounded border border-slate-200 p-2">
               <p className="text-xs text-slate-500">Cobradores activos</p>
