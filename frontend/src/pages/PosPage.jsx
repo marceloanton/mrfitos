@@ -117,6 +117,7 @@ export default function PosPage() {
   });
   const [collectorRanking, setCollectorRanking] = useState([]);
   const [collectorRankingLimit, setCollectorRankingLimit] = useState('25');
+  const [collectorRankingSortBy, setCollectorRankingSortBy] = useState('recovered_amount');
   const [collectorCommissionRules, setCollectorCommissionRules] = useState(null);
   const [summary, setSummary] = useState({
     today_sales_count: 0,
@@ -216,7 +217,9 @@ export default function PosPage() {
         getMemberAccountCollectorRanking({
           date_from: followupDateFrom || undefined,
           date_to: followupDateTo || undefined,
-          limit: Number(collectorRankingLimit || 25)
+          limit: Number(collectorRankingLimit || 25),
+          sort_by: collectorRankingSortBy,
+          sort_dir: 'desc'
         })
       ]);
       setSales(Array.isArray(salesData?.items) ? salesData.items : []);
@@ -915,7 +918,9 @@ ${sale.notes ? `Nota: ${sale.notes}` : ''}
       const blob = await exportMemberAccountCollectorRankingCsv({
         date_from: followupDateFrom || undefined,
         date_to: followupDateTo || undefined,
-        limit: Number(collectorRankingLimit || 25)
+        limit: Number(collectorRankingLimit || 25),
+        sort_by: collectorRankingSortBy,
+        sort_dir: 'desc'
       });
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -983,6 +988,11 @@ ${sale.notes ? `Nota: ${sale.notes}` : ''}
             <option value="10">Top 10</option>
             <option value="25">Top 25</option>
             <option value="50">Top 50</option>
+          </select>
+          <select className="rounded border border-slate-300 p-2 text-sm" value={collectorRankingSortBy} onChange={(e) => setCollectorRankingSortBy(e.target.value)}>
+            <option value="recovered_amount">Orden: Recuperado</option>
+            <option value="response_rate">Orden: Tasa respuesta</option>
+            <option value="contacts_count">Orden: Contactos</option>
           </select>
           <button className="rounded border border-slate-300 px-2 py-2 text-xs" onClick={() => applyFollowupRangePreset(7)}>
             7d

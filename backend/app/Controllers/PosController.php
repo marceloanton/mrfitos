@@ -346,13 +346,17 @@ final class PosController
         $dateFrom = Request::query('date_from', null);
         $dateTo = Request::query('date_to', null);
         $limit = Request::query('limit', null);
+        $sortBy = Request::query('sort_by', null);
+        $sortDir = Request::query('sort_dir', null);
         try {
             $data = $this->service->getMemberAccountCollectorRanking(
                 (int) ($auth['tenant_id'] ?? 0),
                 (int) ($auth['gym_id'] ?? 0),
                 $dateFrom,
                 $dateTo,
-                $limit
+                $limit,
+                $sortBy,
+                $sortDir
             );
             Response::json(['success' => true, 'data' => $data]);
         } catch (\InvalidArgumentException $e) {
@@ -368,10 +372,12 @@ final class PosController
         $dateFrom = Request::query('date_from', null);
         $dateTo = Request::query('date_to', null);
         $limit = Request::query('limit', null);
+        $sortBy = Request::query('sort_by', null);
+        $sortDir = Request::query('sort_dir', null);
         try {
             $tenantId = (int) ($auth['tenant_id'] ?? 0);
             $gymId = (int) ($auth['gym_id'] ?? 0);
-            $data = $this->service->getMemberAccountCollectorRanking($tenantId, $gymId, $dateFrom, $dateTo, $limit);
+            $data = $this->service->getMemberAccountCollectorRanking($tenantId, $gymId, $dateFrom, $dateTo, $limit, $sortBy, $sortDir);
             $this->emitMemberAccountCollectorRankingCsv($tenantId, $gymId, $data);
         } catch (\InvalidArgumentException $e) {
             Response::json(['success' => false, 'message' => $e->getMessage()], 422);
@@ -1388,6 +1394,8 @@ final class PosController
         fputcsv($out, ['metadata', 'date_from', $dateFrom]);
         fputcsv($out, ['metadata', 'date_to', $dateTo]);
         fputcsv($out, ['metadata', 'limit', $this->normalizeCsvValue($data['limit'] ?? null)]);
+        fputcsv($out, ['metadata', 'sort_by', $this->normalizeCsvValue($data['sort_by'] ?? null)]);
+        fputcsv($out, ['metadata', 'sort_dir', $this->normalizeCsvValue($data['sort_dir'] ?? null)]);
         fputcsv($out, ['', '', '']);
 
         $this->writeSectionRows($out, 'totals', [

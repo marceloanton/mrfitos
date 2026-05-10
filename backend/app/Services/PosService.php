@@ -554,7 +554,15 @@ final class PosService
         ];
     }
 
-    public function getMemberAccountCollectorRanking(int $tenantId, int $gymId, mixed $dateFromInput, mixed $dateToInput, mixed $limitInput = null): array
+    public function getMemberAccountCollectorRanking(
+        int $tenantId,
+        int $gymId,
+        mixed $dateFromInput,
+        mixed $dateToInput,
+        mixed $limitInput = null,
+        mixed $sortByInput = null,
+        mixed $sortDirInput = null
+    ): array
     {
         $dateFrom = $this->resolveOptionalDate($dateFromInput, 'date_from');
         $dateTo = $this->resolveOptionalDate($dateToInput, 'date_to');
@@ -564,6 +572,14 @@ final class PosService
         }
         if ($limit > 100) {
             $limit = 100;
+        }
+        $sortBy = strtolower(trim((string) ($sortByInput ?? 'recovered_amount')));
+        if (!in_array($sortBy, ['recovered_amount', 'response_rate', 'contacts_count'], true)) {
+            $sortBy = 'recovered_amount';
+        }
+        $sortDir = strtolower(trim((string) ($sortDirInput ?? 'desc')));
+        if (!in_array($sortDir, ['asc', 'desc'], true)) {
+            $sortDir = 'desc';
         }
         if ($dateFrom === null && $dateTo === null) {
             $dateTo = date('Y-m-d');
@@ -601,11 +617,24 @@ final class PosService
                 'commission_amount' => round($recoveredAmount * ($commissionRate / 100), 2),
             ];
         }, $rows);
+        usort($items, static function (array $a, array $b) use ($sortBy, $sortDir): int {
+            $va = (float) ($a[$sortBy] ?? 0);
+            $vb = (float) ($b[$sortBy] ?? 0);
+            if ($va === $vb) {
+                return 0;
+            }
+            if ($sortDir === 'asc') {
+                return $va <=> $vb;
+            }
+            return $vb <=> $va;
+        });
 
         return [
             'date_from' => $dateFrom,
             'date_to' => $dateTo,
             'limit' => $limit,
+            'sort_by' => $sortBy,
+            'sort_dir' => $sortDir,
             'commission_rules' => $rules,
             'items' => $items,
         ];
