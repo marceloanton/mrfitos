@@ -471,6 +471,25 @@ final class PosService
             if ($saleId > 0) {
                 $this->repo->updateSalePayment($tenantId, $gymId, $saleId, $paymentId);
             }
+            $this->activity->create([
+                'tenant_id' => $tenantId,
+                'gym_id' => $gymId,
+                'user_id' => $userId > 0 ? $userId : null,
+                'entity_type' => 'pos_sale',
+                'entity_id' => $saleId > 0 ? $saleId : $chargeId,
+                'action' => 'pos_member_account_charge_settled',
+                'metadata' => [
+                    'charge_id' => $chargeId,
+                    'payment_id' => $paymentId,
+                    'member_id' => (int) ($charge['member_id'] ?? 0),
+                    'amount' => (float) ($charge['amount'] ?? 0),
+                    'currency' => (string) ($charge['currency'] ?? 'ARS'),
+                    'method' => $method,
+                    'source' => 'manual'
+                ],
+                'ip_address' => $_SERVER['REMOTE_ADDR'] ?? null,
+                'user_agent' => $_SERVER['HTTP_USER_AGENT'] ?? null,
+            ]);
             $conn->commit();
             return [
                 'charge_id' => $chargeId,
@@ -485,7 +504,14 @@ final class PosService
         }
     }
 
-    public function settlePendingMemberAccountCharges(int $tenantId, int $gymId, int $limit, string $method = 'transfer'): array
+    public function settlePendingMemberAccountCharges(
+        int $tenantId,
+        int $gymId,
+        int $limit,
+        string $method = 'transfer',
+        ?int $actorUserId = null,
+        string $source = 'auto'
+    ): array
     {
         if ($limit <= 0) {
             throw new \InvalidArgumentException('limit must be > 0');
@@ -531,6 +557,25 @@ final class PosService
                 if ($saleId > 0) {
                     $this->repo->updateSalePayment($tenantId, $gymId, $saleId, $paymentId);
                 }
+                $this->activity->create([
+                    'tenant_id' => $tenantId,
+                    'gym_id' => $gymId,
+                    'user_id' => $actorUserId && $actorUserId > 0 ? $actorUserId : null,
+                    'entity_type' => 'pos_sale',
+                    'entity_id' => $saleId > 0 ? $saleId : $chargeId,
+                    'action' => 'pos_member_account_charge_settled',
+                    'metadata' => [
+                        'charge_id' => $chargeId,
+                        'payment_id' => $paymentId,
+                        'member_id' => (int) ($charge['member_id'] ?? 0),
+                        'amount' => (float) ($charge['amount'] ?? 0),
+                        'currency' => (string) ($charge['currency'] ?? 'ARS'),
+                        'method' => $method,
+                        'source' => $source
+                    ],
+                    'ip_address' => $_SERVER['REMOTE_ADDR'] ?? null,
+                    'user_agent' => $_SERVER['HTTP_USER_AGENT'] ?? null,
+                ]);
                 $conn->commit();
                 $settled++;
             } catch (\Throwable $e) {
@@ -545,7 +590,7 @@ final class PosService
             }
         }
 
-        return [
+        $result = [
             'tenant_id' => $tenantId,
             'gym_id' => $gymId,
             'processed' => $processed,
@@ -553,6 +598,27 @@ final class PosService
             'failed' => $failed,
             'failures' => $failures,
         ];
+
+        $this->activity->create([
+            'tenant_id' => $tenantId,
+            'gym_id' => $gymId,
+            'user_id' => $actorUserId && $actorUserId > 0 ? $actorUserId : null,
+            'entity_type' => 'pos_sale',
+            'entity_id' => null,
+            'action' => 'pos_member_account_autosettle_run',
+            'metadata' => [
+                'method' => $method,
+                'limit' => $limit,
+                'source' => $source,
+                'processed' => $processed,
+                'settled' => $settled,
+                'failed' => $failed
+            ],
+            'ip_address' => $_SERVER['REMOTE_ADDR'] ?? null,
+            'user_agent' => $_SERVER['HTTP_USER_AGENT'] ?? null,
+        ]);
+
+        return $result;
     }
 
     public function adjustStock(int $tenantId, int $gymId, int $userId, array $input): array

@@ -182,7 +182,9 @@ final class PosController
                 (int) ($auth['tenant_id'] ?? 0),
                 (int) ($auth['gym_id'] ?? 0),
                 $limit,
-                $method
+                $method,
+                (int) ($auth['sub'] ?? 0),
+                'manual_batch'
             );
             Response::json([
                 'success' => true,
@@ -636,7 +638,7 @@ final class PosController
                     return;
                 }
 
-                $data = $this->service->settlePendingMemberAccountCharges($tenantId, $gymId, $limit, $method);
+                $data = $this->service->settlePendingMemberAccountCharges($tenantId, $gymId, $limit, $method, null, 'cron_single');
                 Response::json([
                     'success' => true,
                     'message' => 'POS member account auto-settlement executed',
@@ -666,7 +668,7 @@ final class PosController
                 }
 
                 try {
-                    $result = $this->service->settlePendingMemberAccountCharges($tenantId, $gymId, $limit, $method);
+                    $result = $this->service->settlePendingMemberAccountCharges($tenantId, $gymId, $limit, $method, null, 'cron_bulk');
                     $items[] = $result;
                     $totals['processed'] += (int) ($result['processed'] ?? 0);
                     $totals['settled'] += (int) ($result['settled'] ?? 0);
