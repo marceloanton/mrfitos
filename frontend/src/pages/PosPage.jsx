@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { adjustStock, closeCashSession, createPosProduct, createPosSale, exportPosZCloseCsv, getCashSessionReport, getOpenCashSessionSummary, getPosConfig, getPosSaleReceipt, getPosSaleReceiptByNumber, getPosSummary, getPosZCloseReport, listCashSessions, listLowStockProducts, listMemberAccountCharges, listPosProducts, listPosSales, listStockMovements, openCashSession, settleMemberAccountCharge, updatePosConfig } from '../services/posService';
+import { adjustStock, closeCashSession, createPosProduct, createPosSale, exportPosZCloseCsv, getCashSessionReport, getOpenCashSessionSummary, getPosConfig, getPosSaleReceipt, getPosSaleReceiptByNumber, getPosSummary, getPosZCloseReport, listCashSessions, listLowStockProducts, listMemberAccountCharges, listPosProducts, listPosSales, listStockMovements, openCashSession, settleMemberAccountCharge, updatePosConfig, voidPosSale } from '../services/posService';
 
 export default function PosPage() {
   const [requireOpenCash, setRequireOpenCash] = useState(true);
@@ -432,6 +432,25 @@ ${sale.notes ? `Nota: ${sale.notes}` : ''}
     }
   };
 
+  const onVoidSale = async (sale) => {
+    const reason = window.prompt('Motivo de anulación (mínimo 5 caracteres):', '');
+    if (reason === null) return;
+    const trimmed = reason.trim();
+    if (trimmed.length < 5) {
+      setError('El motivo debe tener al menos 5 caracteres.');
+      return;
+    }
+    setError('');
+    setMessage('');
+    try {
+      await voidPosSale(sale.id, { reason: trimmed });
+      setMessage(`Venta #${sale.id} anulada correctamente.`);
+      await load();
+    } catch (err) {
+      setError(err?.response?.data?.message ?? 'No se pudo anular la venta POS.');
+    }
+  };
+
   return (
     <section className="space-y-4">
       <div className="rounded-xl bg-white p-4 shadow-sm">
@@ -693,13 +712,16 @@ ${sale.notes ? `Nota: ${sale.notes}` : ''}
             <p className="text-sm text-slate-500">Sin ventas.</p>
           ) : sales.map((s) => (
             <div key={s.id} className="flex items-center justify-between gap-2 rounded border border-slate-200 p-2 text-sm">
-              <span>#{s.id} · {s.total_amount} {s.currency} · {s.charge_mode} · {s.member_code ? `${s.member_code} ${s.first_name} ${s.last_name}` : 'sin socio'}</span>
+              <span>{s.receipt_number ?? `#${s.id}`} · {s.total_amount} {s.currency} · {s.charge_mode} · {s.member_code ? `${s.member_code} ${s.first_name} ${s.last_name}` : 'sin socio'}</span>
               <div className="flex gap-1">
                 <button className="rounded border border-slate-300 px-2 py-1" onClick={() => onPrintSaleTicket(s.id, '58')}>
                   Ticket 58mm
                 </button>
                 <button className="rounded border border-slate-300 px-2 py-1" onClick={() => onPrintSaleTicket(s.id, '80')}>
                   Ticket 80mm
+                </button>
+                <button className="rounded border border-red-300 px-2 py-1 text-red-700" onClick={() => onVoidSale(s)}>
+                  Anular
                 </button>
               </div>
             </div>

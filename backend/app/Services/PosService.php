@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Repositories\PosRepository;
+use App\Repositories\ActivityLogRepository;
 use Core\Database;
 use Core\Env;
 
@@ -10,7 +11,10 @@ final class PosService
 {
     private const SETTING_REQUIRE_OPEN_CASH = 'pos.require_open_cash';
 
-    public function __construct(private readonly PosRepository $repo = new PosRepository())
+    public function __construct(
+        private readonly PosRepository $repo = new PosRepository(),
+        private readonly ActivityLogRepository $activity = new ActivityLogRepository()
+    )
     {
     }
 
@@ -103,6 +107,7 @@ final class PosService
             throw new \InvalidArgumentException('Sale not found');
         }
 
+        $saleId = (int) ($sale['id'] ?? 0);
         $items = $this->repo->listSaleItems($tenantId, $gymId, $saleId);
         $normalizedItems = array_map(static fn (array $item): array => [
             'item_name' => (string) ($item['item_name'] ?? ''),
@@ -142,6 +147,108 @@ final class PosService
             'items' => $normalizedItems,
             'payment' => $payment,
         ];
+    }
+
+    public function voidSale(int $tenantId, int $gymId, int $userId, int $saleId, array $input): array
+    {
+        if ($saleId <= 0) {
+            throw new \InvalidArgumentException('Invalid sale id');
+        }
+
+        $reason = trim((string) ($input['reason'] ?? ''));
+        if (mb_strlen($reason) < 5) {
+            throw new \InvalidArgumentException('reason is required (min 5 chars)');
+        }
+
+        $sale = $this->repo->findSaleByIdAnyStatus($tenantId, $gymId, $saleId);
+        if (!$sale) {
+            throw new \InvalidArgumentException('Sale not found');
+        }
+        if (!empty($sale['deleted_at'])) {
+            throw new \InvalidArgumentException('Sale already voided');
+        }
+
+        $conn = Database::connection();
+        $conn->beginTransaction();
+        try {
+            $saleItems = $this->repo->listSaleItemsWithProduct($tenantId, $gymId, $saleId);
+            foreach ($saleItems as $item) {
+                $productId = isset($item['product_id']) ? (int) $item['product_id'] : 0;
+                $trackStock = (int) ($item['track_stock'] ?? 0);
+                if ($productId > 0 && $trackStock === 1) {
+                    $qty = (float) ($item['qty'] ?? 0);
+                    if ($qty <= 0) {
+                        continue;
+                    }
+                    $ok = $this->repo->incrementStock($tenantId, $gymId, $productId, $qty);
+                    if (!$ok) {
+                        throw new \RuntimeException('Failed to restore stock for product ' . $productId);
+                    }
+                    $updated = $this->repo->findProductById($tenantId, $gymId, $productId);
+                    $this->repo->createStockMovement([
+                        'tenant_id' => $tenantId,
+                        'gym_id' => $gymId,
+                        'product_id' => $productId,
+                        'movement_type' => 'in',
+                        'qty' => $qty,
+                        'balance_after' => (float) ($updated['stock_qty'] ?? 0),
+                        'reference_type' => 'sale_void',
+                        'reference_id' => $saleId,
+                        'created_by_user_id' => $userId > 0 ? $userId : null,
+                        'notes' => 'POS sale void restock'
+                    ]);
+                }
+            }
+
+            $existingNotes = trim((string) ($sale['notes'] ?? ''));
+            $voidNote = '[VOID ' . date('Y-m-d H:i:s') . '] reason: ' . $reason;
+            $finalNotes = $existingNotes === '' ? $voidNote : ($existingNotes . ' | ' . $voidNote);
+            $voided = $this->repo->markSaleVoided($tenantId, $gymId, $saleId, substr($finalNotes, 0, 255));
+            if (!$voided) {
+                throw new \RuntimeException('Unable to void sale');
+            }
+
+            $pendingCharge = $this->repo->findPendingMemberAccountChargeBySaleId($tenantId, $gymId, $saleId);
+            $chargeCancelled = false;
+            if ($pendingCharge) {
+                $chargeNotesBase = trim((string) ($pendingCharge['notes'] ?? ''));
+                $chargeVoidNote = '[VOID ' . date('Y-m-d H:i:s') . '] cancelled by sale void #' . $saleId;
+                $chargeNotes = $chargeNotesBase === '' ? $chargeVoidNote : ($chargeNotesBase . ' | ' . $chargeVoidNote);
+                $chargeCancelled = $this->repo->cancelMemberAccountCharge(
+                    $tenantId,
+                    $gymId,
+                    (int) $pendingCharge['id'],
+                    substr($chargeNotes, 0, 255)
+                );
+            }
+
+            $this->activity->create([
+                'tenant_id' => $tenantId,
+                'gym_id' => $gymId,
+                'user_id' => $userId > 0 ? $userId : null,
+                'entity_type' => 'pos_sale',
+                'entity_id' => $saleId,
+                'action' => 'void',
+                'metadata' => [
+                    'reason' => $reason,
+                    'status' => 'voided',
+                    'member_account_charge_cancelled' => $chargeCancelled,
+                ],
+                'ip_address' => $_SERVER['REMOTE_ADDR'] ?? null,
+                'user_agent' => $_SERVER['HTTP_USER_AGENT'] ?? null,
+            ]);
+
+            $conn->commit();
+            return [
+                'sale_id' => $saleId,
+                'status' => 'voided',
+            ];
+        } catch (\Throwable $e) {
+            if ($conn->inTransaction()) {
+                $conn->rollBack();
+            }
+            throw $e;
+        }
     }
 
     public function createSale(int $tenantId, int $gymId, int $userId, array $input): array

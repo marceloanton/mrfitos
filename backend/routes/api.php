@@ -121,6 +121,7 @@ $router->add('GET', '/pos/sales', [PosController::class, 'sales'], [AuthMiddlewa
 $router->add('GET', '/pos/sales/receipt', [PosController::class, 'saleReceiptByNumber'], [AuthMiddleware::class, TenantMiddleware::class, new PermissionMiddleware('payments.read')]);
 $router->add('GET', '/pos/sales/{id}/receipt', [PosController::class, 'saleReceipt'], [AuthMiddleware::class, TenantMiddleware::class, new PermissionMiddleware('payments.read')]);
 $router->add('POST', '/pos/sales', [PosController::class, 'createSale'], [AuthMiddleware::class, TenantMiddleware::class, new PermissionMiddleware('payments.write')]);
+$router->add('POST', '/pos/sales/{id}/void', [PosController::class, 'voidSale'], [AuthMiddleware::class, TenantMiddleware::class, new PermissionMiddleware('payments.write')]);
 $router->add('GET', '/pos/member-account/charges', [PosController::class, 'memberAccountCharges'], [AuthMiddleware::class, TenantMiddleware::class, new PermissionMiddleware('payments.read')]);
 $router->add('POST', '/pos/member-account/charges/{id}/settle', [PosController::class, 'settleMemberAccountCharge'], [AuthMiddleware::class, TenantMiddleware::class, new PermissionMiddleware('payments.write')]);
 $router->add('GET', '/pos/stock/movements', [PosController::class, 'stockMovements'], [AuthMiddleware::class, TenantMiddleware::class, new PermissionMiddleware('payments.read')]);

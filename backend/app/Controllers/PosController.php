@@ -91,6 +91,26 @@ final class PosController
         }
     }
 
+    public function voidSale(): void
+    {
+        $auth = json_decode($_SERVER['auth_user'] ?? '{}', true) ?: [];
+        $saleId = (int) Request::param('id', 0);
+        try {
+            $data = $this->service->voidSale(
+                (int) $auth['tenant_id'],
+                (int) $auth['gym_id'],
+                (int) ($auth['sub'] ?? 0),
+                $saleId,
+                Request::json()
+            );
+            Response::json(['success' => true, 'data' => $data]);
+        } catch (\InvalidArgumentException $e) {
+            Response::json(['success' => false, 'message' => $e->getMessage()], 422);
+        } catch (\Throwable $e) {
+            Response::json(['success' => false, 'message' => 'Failed to void POS sale'], 500);
+        }
+    }
+
     public function saleReceipt(): void
     {
         $auth = json_decode($_SERVER['auth_user'] ?? '{}', true) ?: [];

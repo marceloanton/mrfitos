@@ -6,6 +6,25 @@ use Core\Database;
 
 final class PosRepository
 {
+    public function findSaleByIdAnyStatus(int $tenantId, int $gymId, int $saleId): ?array
+    {
+        $stmt = Database::connection()->prepare(
+            'SELECT id, tenant_id, gym_id, member_id, sold_by_user_id, total_amount, currency, charge_mode, payment_id, notes, deleted_at, created_at, updated_at
+             FROM pos_sales
+             WHERE id = :id
+               AND tenant_id = :tenant_id
+               AND gym_id = :gym_id
+             LIMIT 1'
+        );
+        $stmt->execute([
+            'id' => $saleId,
+            'tenant_id' => $tenantId,
+            'gym_id' => $gymId
+        ]);
+        $row = $stmt->fetch();
+        return $row ?: null;
+    }
+
     public function findSaleById(int $tenantId, int $gymId, int $saleId): ?array
     {
         $stmt = Database::connection()->prepare(
@@ -59,6 +78,28 @@ final class PosRepository
                AND tenant_id = :tenant_id
                AND gym_id = :gym_id
              ORDER BY id ASC'
+        );
+        $stmt->execute([
+            'sale_id' => $saleId,
+            'tenant_id' => $tenantId,
+            'gym_id' => $gymId
+        ]);
+        return $stmt->fetchAll() ?: [];
+    }
+
+    public function listSaleItemsWithProduct(int $tenantId, int $gymId, int $saleId): array
+    {
+        $stmt = Database::connection()->prepare(
+            'SELECT si.id, si.product_id, si.item_name, si.qty, si.unit_price, si.line_total,
+                    p.track_stock, p.stock_qty
+             FROM pos_sale_items si
+             LEFT JOIN pos_products p ON p.id = si.product_id
+                AND p.tenant_id = si.tenant_id
+                AND p.gym_id = si.gym_id
+             WHERE si.sale_id = :sale_id
+               AND si.tenant_id = :tenant_id
+               AND si.gym_id = :gym_id
+             ORDER BY si.id ASC'
         );
         $stmt->execute([
             'sale_id' => $saleId,
@@ -844,5 +885,66 @@ final class PosRepository
             'tenant_id' => $tenantId,
             'gym_id' => $gymId
         ]);
+    }
+
+    public function markSaleVoided(int $tenantId, int $gymId, int $saleId, string $notes): bool
+    {
+        $stmt = Database::connection()->prepare(
+            'UPDATE pos_sales
+             SET deleted_at = NOW(), notes = :notes, updated_at = NOW()
+             WHERE id = :id
+               AND tenant_id = :tenant_id
+               AND gym_id = :gym_id
+               AND deleted_at IS NULL'
+        );
+        $stmt->execute([
+            'notes' => $notes,
+            'id' => $saleId,
+            'tenant_id' => $tenantId,
+            'gym_id' => $gymId,
+        ]);
+        return $stmt->rowCount() > 0;
+    }
+
+    public function findPendingMemberAccountChargeBySaleId(int $tenantId, int $gymId, int $saleId): ?array
+    {
+        $stmt = Database::connection()->prepare(
+            'SELECT id, status, notes
+             FROM member_account_charges
+             WHERE tenant_id = :tenant_id
+               AND gym_id = :gym_id
+               AND sale_id = :sale_id
+               AND status = "pending_auto_debit"
+             ORDER BY id DESC
+             LIMIT 1'
+        );
+        $stmt->execute([
+            'tenant_id' => $tenantId,
+            'gym_id' => $gymId,
+            'sale_id' => $saleId
+        ]);
+        $row = $stmt->fetch();
+        return $row ?: null;
+    }
+
+    public function cancelMemberAccountCharge(int $tenantId, int $gymId, int $chargeId, ?string $notes): bool
+    {
+        $stmt = Database::connection()->prepare(
+            'UPDATE member_account_charges
+             SET status = "cancelled",
+                 notes = :notes,
+                 updated_at = NOW()
+             WHERE id = :id
+               AND tenant_id = :tenant_id
+               AND gym_id = :gym_id
+               AND status = "pending_auto_debit"'
+        );
+        $stmt->execute([
+            'id' => $chargeId,
+            'tenant_id' => $tenantId,
+            'gym_id' => $gymId,
+            'notes' => $notes
+        ]);
+        return $stmt->rowCount() > 0;
     }
 }

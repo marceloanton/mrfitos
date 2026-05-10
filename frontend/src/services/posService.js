@@ -55,6 +55,11 @@ export async function createPosSale(body) {
   return payload(data);
 }
 
+export async function voidPosSale(id, body = {}) {
+  const { data } = await api.post(`/pos/sales/${id}/void`, body);
+  return payload(data);
+}
+
 export async function listMemberAccountCharges(params = {}) {
   const { data } = await api.get('/pos/member-account/charges', { params });
   return payload(data);
