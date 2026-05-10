@@ -255,10 +255,17 @@ final class PosController
         $auth = json_decode($_SERVER['auth_user'] ?? '{}', true) ?: [];
         $page = max(1, (int) Request::query('page', 1));
         $perPage = min(100, max(1, (int) Request::query('per_page', 20)));
-        Response::json([
-            'success' => true,
-            'data' => $this->service->listCashSessions((int) $auth['tenant_id'], (int) $auth['gym_id'], $page, $perPage)
-        ]);
+        $userId = Request::query('user_id', null);
+        try {
+            Response::json([
+                'success' => true,
+                'data' => $this->service->listCashSessions((int) $auth['tenant_id'], (int) $auth['gym_id'], $page, $perPage, $userId)
+            ]);
+        } catch (\InvalidArgumentException $e) {
+            Response::json(['success' => false, 'message' => $e->getMessage()], 422);
+        } catch (\Throwable $e) {
+            Response::json(['success' => false, 'message' => 'Failed to list cash sessions'], 500);
+        }
     }
 
     public function cashSessionReport(): void
@@ -286,6 +293,28 @@ final class PosController
             Response::json(['success' => false, 'message' => $e->getMessage()], 422);
         } catch (\Throwable $e) {
             Response::json(['success' => false, 'message' => 'Failed to build POS daily Z close report'], 500);
+        }
+    }
+
+    public function cashByOperatorReport(): void
+    {
+        $auth = json_decode($_SERVER['auth_user'] ?? '{}', true) ?: [];
+        $dateFrom = Request::query('date_from', null);
+        $dateTo = Request::query('date_to', null);
+        $userId = Request::query('user_id', null);
+        try {
+            $data = $this->service->getCashByOperatorReport(
+                (int) $auth['tenant_id'],
+                (int) $auth['gym_id'],
+                $dateFrom,
+                $dateTo,
+                $userId
+            );
+            Response::json(['success' => true, 'data' => $data]);
+        } catch (\InvalidArgumentException $e) {
+            Response::json(['success' => false, 'message' => $e->getMessage()], 422);
+        } catch (\Throwable $e) {
+            Response::json(['success' => false, 'message' => 'Failed to build cash-by-operator report'], 500);
         }
     }
 

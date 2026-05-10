@@ -100,6 +100,11 @@ export async function listCashSessions(params = {}) {
   return payload(data);
 }
 
+export async function getCashByOperatorReport(params = {}) {
+  const { data } = await api.get('/pos/reports/cash-by-operator', { params });
+  return payload(data);
+}
+
 export async function getCashSessionReport(id) {
   const { data } = await api.get(`/pos/cash-sessions/${id}/report`);
   return payload(data);

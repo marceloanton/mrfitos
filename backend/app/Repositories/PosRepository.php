@@ -466,24 +466,30 @@ final class PosRepository
         return (float) $stmt->fetchColumn();
     }
 
-    public function listCashSessions(int $tenantId, int $gymId, int $page, int $perPage): array
+    public function listCashSessions(int $tenantId, int $gymId, int $page, int $perPage, ?int $userId = null): array
     {
         $offset = ($page - 1) * $perPage;
-        $countStmt = Database::connection()->prepare(
-            'SELECT COUNT(*) FROM pos_cash_sessions WHERE tenant_id = :tenant_id AND gym_id = :gym_id'
-        );
-        $countStmt->execute(['tenant_id' => $tenantId, 'gym_id' => $gymId]);
+        $where = 'tenant_id = :tenant_id AND gym_id = :gym_id';
+        $params = ['tenant_id' => $tenantId, 'gym_id' => $gymId];
+        if ($userId !== null && $userId > 0) {
+            $where .= ' AND (opened_by_user_id = :user_id OR closed_by_user_id = :user_id)';
+            $params['user_id'] = $userId;
+        }
+
+        $countStmt = Database::connection()->prepare("SELECT COUNT(*) FROM pos_cash_sessions WHERE {$where}");
+        $countStmt->execute($params);
         $total = (int) $countStmt->fetchColumn();
 
         $stmt = Database::connection()->prepare(
-            'SELECT id, status, opening_amount, expected_amount, closing_amount, difference_amount, opened_at, closed_at, notes
+            "SELECT id, status, opening_amount, expected_amount, closing_amount, difference_amount, opened_at, closed_at, notes
              FROM pos_cash_sessions
-             WHERE tenant_id = :tenant_id AND gym_id = :gym_id
+             WHERE {$where}
              ORDER BY id DESC
-             LIMIT :limit OFFSET :offset'
+             LIMIT :limit OFFSET :offset"
         );
-        $stmt->bindValue(':tenant_id', $tenantId, \PDO::PARAM_INT);
-        $stmt->bindValue(':gym_id', $gymId, \PDO::PARAM_INT);
+        foreach ($params as $key => $value) {
+            $stmt->bindValue(':' . $key, $value, \PDO::PARAM_INT);
+        }
         $stmt->bindValue(':limit', $perPage, \PDO::PARAM_INT);
         $stmt->bindValue(':offset', $offset, \PDO::PARAM_INT);
         $stmt->execute();
@@ -497,6 +503,130 @@ final class PosRepository
                 'total_pages' => (int) max(1, ceil($total / $perPage))
             ]
         ];
+    }
+
+    public function getCashByOperatorSummary(
+        int $tenantId,
+        int $gymId,
+        ?string $dateFrom,
+        ?string $dateTo,
+        ?int $userId
+    ): array {
+        $where = 'tenant_id = :tenant_id AND gym_id = :gym_id';
+        $params = ['tenant_id' => $tenantId, 'gym_id' => $gymId];
+
+        if ($dateFrom !== null) {
+            $where .= ' AND DATE(opened_at) >= :date_from';
+            $params['date_from'] = $dateFrom;
+        }
+        if ($dateTo !== null) {
+            $where .= ' AND DATE(opened_at) <= :date_to';
+            $params['date_to'] = $dateTo;
+        }
+        if ($userId !== null && $userId > 0) {
+            $where .= ' AND (opened_by_user_id = :user_id OR closed_by_user_id = :user_id)';
+            $params['user_id'] = $userId;
+        }
+
+        $stmt = Database::connection()->prepare(
+            "SELECT
+                COUNT(*) AS sessions_count,
+                COALESCE(SUM(opening_amount), 0) AS opening_total,
+                COALESCE(SUM(expected_amount), 0) AS expected_total,
+                COALESCE(SUM(closing_amount), 0) AS closing_total,
+                COALESCE(SUM(difference_amount), 0) AS difference_total
+             FROM pos_cash_sessions
+             WHERE {$where}"
+        );
+        $stmt->execute($params);
+        $row = $stmt->fetch() ?: [];
+
+        return [
+            'sessions_count' => (int) ($row['sessions_count'] ?? 0),
+            'opening_total' => (float) ($row['opening_total'] ?? 0),
+            'expected_total' => (float) ($row['expected_total'] ?? 0),
+            'closing_total' => (float) ($row['closing_total'] ?? 0),
+            'difference_total' => (float) ($row['difference_total'] ?? 0),
+        ];
+    }
+
+    public function getCashByOperatorRows(
+        int $tenantId,
+        int $gymId,
+        ?string $dateFrom,
+        ?string $dateTo,
+        ?int $userId
+    ): array {
+        $baseWhereA = 'tenant_id = :tenant_id_a AND gym_id = :gym_id_a';
+        $baseWhereB = 'tenant_id = :tenant_id_b AND gym_id = :gym_id_b';
+        $params = [
+            'tenant_id_a' => $tenantId,
+            'gym_id_a' => $gymId,
+            'tenant_id_b' => $tenantId,
+            'gym_id_b' => $gymId
+        ];
+
+        if ($dateFrom !== null) {
+            $baseWhereA .= ' AND DATE(opened_at) >= :date_from_a';
+            $baseWhereB .= ' AND DATE(opened_at) >= :date_from_b';
+            $params['date_from_a'] = $dateFrom;
+            $params['date_from_b'] = $dateFrom;
+        }
+        if ($dateTo !== null) {
+            $baseWhereA .= ' AND DATE(opened_at) <= :date_to_a';
+            $baseWhereB .= ' AND DATE(opened_at) <= :date_to_b';
+            $params['date_to_a'] = $dateTo;
+            $params['date_to_b'] = $dateTo;
+        }
+        if ($userId !== null && $userId > 0) {
+            $baseWhereA .= ' AND (opened_by_user_id = :filter_user_id_a OR closed_by_user_id = :filter_user_id_a)';
+            $baseWhereB .= ' AND (opened_by_user_id = :filter_user_id_b OR closed_by_user_id = :filter_user_id_b)';
+            $params['filter_user_id_a'] = $userId;
+            $params['filter_user_id_b'] = $userId;
+        }
+
+        $sql = "SELECT
+                    x.user_id,
+                    COUNT(*) AS sessions_count,
+                    COALESCE(SUM(x.opening_amount), 0) AS opening_total,
+                    COALESCE(SUM(x.expected_amount), 0) AS expected_total,
+                    COALESCE(SUM(x.closing_amount), 0) AS closing_total,
+                    COALESCE(SUM(x.difference_amount), 0) AS difference_total
+                FROM (
+                    SELECT
+                        id,
+                        opened_by_user_id AS user_id,
+                        opening_amount,
+                        expected_amount,
+                        closing_amount,
+                        difference_amount,
+                        closed_by_user_id
+                    FROM pos_cash_sessions
+                    WHERE {$baseWhereA}
+                      AND opened_by_user_id IS NOT NULL
+                    UNION ALL
+                    SELECT
+                        id,
+                        closed_by_user_id AS user_id,
+                        opening_amount,
+                        expected_amount,
+                        closing_amount,
+                        difference_amount,
+                        opened_by_user_id
+                    FROM pos_cash_sessions
+                    WHERE {$baseWhereB}
+                      AND closed_by_user_id IS NOT NULL
+                      AND (opened_by_user_id IS NULL OR closed_by_user_id <> opened_by_user_id)
+                ) x
+                GROUP BY x.user_id
+                ORDER BY x.sessions_count DESC, x.user_id ASC";
+
+        $stmt = Database::connection()->prepare($sql);
+        foreach ($params as $key => $value) {
+            $stmt->bindValue(':' . $key, $value);
+        }
+        $stmt->execute();
+        return $stmt->fetchAll() ?: [];
     }
 
     public function listProducts(int $tenantId, int $gymId): array

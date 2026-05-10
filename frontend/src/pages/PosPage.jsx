@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { adjustStock, closeCashSession, createPosProduct, createPosSale, exportPosZCloseCsv, getCashSessionReport, getOpenCashSessionSummary, getPosConfig, getPosSaleReceipt, getPosSaleReceiptByNumber, getPosSummary, getPosZCloseReport, listCashSessions, listLowStockProducts, listMemberAccountCharges, listPosProducts, listPosSales, listStockMovements, openCashSession, settleMemberAccountCharge, updatePosConfig, voidPosSale } from '../services/posService';
+import { adjustStock, closeCashSession, createPosProduct, createPosSale, exportPosZCloseCsv, getCashByOperatorReport, getCashSessionReport, getOpenCashSessionSummary, getPosConfig, getPosSaleReceipt, getPosSaleReceiptByNumber, getPosSummary, getPosZCloseReport, listCashSessions, listLowStockProducts, listMemberAccountCharges, listPosProducts, listPosSales, listStockMovements, openCashSession, settleMemberAccountCharge, updatePosConfig, voidPosSale } from '../services/posService';
 
 export default function PosPage() {
   const [requireOpenCash, setRequireOpenCash] = useState(true);
@@ -29,6 +29,8 @@ export default function PosPage() {
   const [zCloseDate, setZCloseDate] = useState(new Date().toISOString().slice(0, 10));
   const [lowStockThreshold, setLowStockThreshold] = useState('5');
   const [lowStockItems, setLowStockItems] = useState([]);
+  const [cashOperatorUserId, setCashOperatorUserId] = useState('');
+  const [cashByOperator, setCashByOperator] = useState({ summary: null, operators: [] });
   const [summary, setSummary] = useState({
     today_sales_count: 0,
     today_sales_total: 0,
@@ -38,16 +40,17 @@ export default function PosPage() {
 
   const load = async () => {
     try {
-      const [salesData, chargesData, productsData, movementsData, openCashData, cashSessionsData, posConfig, summaryData, lowStockData] = await Promise.all([
+      const [salesData, chargesData, productsData, movementsData, openCashData, cashSessionsData, posConfig, summaryData, lowStockData, cashByOperatorData] = await Promise.all([
         listPosSales({ page: 1, per_page: 20 }),
         listMemberAccountCharges({ status: 'pending_auto_debit', page: 1, per_page: 20 }),
         listPosProducts(),
         listStockMovements({ page: 1, per_page: 20 }),
         getOpenCashSessionSummary(),
-        listCashSessions({ page: 1, per_page: 10 }),
+        listCashSessions({ page: 1, per_page: 10, user_id: cashOperatorUserId ? Number(cashOperatorUserId) : undefined }),
         getPosConfig(),
         getPosSummary(),
-        listLowStockProducts({ threshold: Number(lowStockThreshold || 5) })
+        listLowStockProducts({ threshold: Number(lowStockThreshold || 5) }),
+        getCashByOperatorReport({ user_id: cashOperatorUserId ? Number(cashOperatorUserId) : undefined })
       ]);
       setSales(Array.isArray(salesData?.items) ? salesData.items : []);
       setCharges(Array.isArray(chargesData?.items) ? chargesData.items : []);
@@ -63,6 +66,10 @@ export default function PosPage() {
         pending_member_account_total: Number(summaryData?.pending_member_account_total ?? 0)
       });
       setLowStockItems(Array.isArray(lowStockData?.items) ? lowStockData.items : []);
+      setCashByOperator({
+        summary: cashByOperatorData?.summary ?? null,
+        operators: Array.isArray(cashByOperatorData?.operators) ? cashByOperatorData.operators : []
+      });
     } catch {
       // no-op
     }
@@ -744,6 +751,17 @@ ${sale.notes ? `Nota: ${sale.notes}` : ''}
 
       <div className="rounded-xl bg-white p-4 shadow-sm">
         <h3 className="mb-2 text-lg font-semibold text-slate-900">Últimos cierres de caja</h3>
+        <div className="mb-3 flex items-center gap-2">
+          <input
+            className="w-32 rounded border border-slate-300 p-2 text-sm"
+            placeholder="user_id"
+            value={cashOperatorUserId}
+            onChange={(e) => setCashOperatorUserId(e.target.value)}
+          />
+          <button className="rounded border border-slate-300 px-2 py-1 text-sm" onClick={load}>
+            Filtrar operador
+          </button>
+        </div>
         <div className="space-y-2">
           {cashSessions.length === 0 ? (
             <p className="text-sm text-slate-500">Sin sesiones de caja.</p>
@@ -755,6 +773,26 @@ ${sale.notes ? `Nota: ${sale.notes}` : ''}
               </button>
             </div>
           ))}
+        </div>
+      </div>
+
+      <div className="rounded-xl bg-white p-4 shadow-sm">
+        <h3 className="mb-2 text-lg font-semibold text-slate-900">Resumen caja por operador</h3>
+        {cashByOperator?.summary ? (
+          <div className="mb-3 text-sm text-slate-700">
+            Sesiones: {cashByOperator.summary.sessions_count ?? 0} · Apertura: {cashByOperator.summary.opening_total ?? 0} · Esperado: {cashByOperator.summary.expected_total ?? 0} · Cierre: {cashByOperator.summary.closing_total ?? 0} · Diferencia: {cashByOperator.summary.difference_total ?? 0}
+          </div>
+        ) : (
+          <p className="mb-3 text-sm text-slate-500">Sin resumen.</p>
+        )}
+        <div className="space-y-2">
+          {Array.isArray(cashByOperator?.operators) && cashByOperator.operators.length > 0 ? cashByOperator.operators.map((r) => (
+            <div key={String(r.user_id)} className="rounded border border-slate-200 p-2 text-sm">
+              Usuario {r.user_id} · sesiones {r.sessions_count} · apertura {r.opening_total} · esperado {r.expected_total} · cierre {r.closing_total} · diferencia {r.difference_total}
+            </div>
+          )) : (
+            <p className="text-sm text-slate-500">Sin datos por operador.</p>
+          )}
         </div>
       </div>
     </section>

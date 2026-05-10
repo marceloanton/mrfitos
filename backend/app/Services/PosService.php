@@ -634,9 +634,56 @@ final class PosService
         ];
     }
 
-    public function listCashSessions(int $tenantId, int $gymId, int $page, int $perPage): array
+    public function listCashSessions(int $tenantId, int $gymId, int $page, int $perPage, mixed $userIdInput = null): array
     {
-        return $this->repo->listCashSessions($tenantId, $gymId, $page, $perPage);
+        $userId = $this->resolveOptionalUserId($userIdInput);
+        return $this->repo->listCashSessions($tenantId, $gymId, $page, $perPage, $userId);
+    }
+
+    public function getCashByOperatorReport(
+        int $tenantId,
+        int $gymId,
+        mixed $dateFromInput,
+        mixed $dateToInput,
+        mixed $userIdInput
+    ): array {
+        $filters = $this->resolveCashByOperatorFilters($dateFromInput, $dateToInput, $userIdInput);
+
+        $summary = $this->repo->getCashByOperatorSummary(
+            $tenantId,
+            $gymId,
+            $filters['date_from'],
+            $filters['date_to'],
+            $filters['user_id']
+        );
+        $rows = $this->repo->getCashByOperatorRows(
+            $tenantId,
+            $gymId,
+            $filters['date_from'],
+            $filters['date_to'],
+            $filters['user_id']
+        );
+
+        $operators = array_map(static fn (array $row): array => [
+            'user_id' => (int) ($row['user_id'] ?? 0),
+            'sessions_count' => (int) ($row['sessions_count'] ?? 0),
+            'opening_total' => (float) ($row['opening_total'] ?? 0),
+            'expected_total' => (float) ($row['expected_total'] ?? 0),
+            'closing_total' => (float) ($row['closing_total'] ?? 0),
+            'difference_total' => (float) ($row['difference_total'] ?? 0),
+        ], $rows);
+
+        return [
+            'filters' => $filters,
+            'summary' => [
+                'sessions_count' => (int) ($summary['sessions_count'] ?? 0),
+                'opening_total' => (float) ($summary['opening_total'] ?? 0),
+                'expected_total' => (float) ($summary['expected_total'] ?? 0),
+                'closing_total' => (float) ($summary['closing_total'] ?? 0),
+                'difference_total' => (float) ($summary['difference_total'] ?? 0),
+            ],
+            'operators' => $operators,
+        ];
     }
 
     public function getCashSessionReport(int $tenantId, int $gymId, int $cashSessionId): array
@@ -827,5 +874,58 @@ final class PosService
         }
 
         return $threshold;
+    }
+
+    private function resolveCashByOperatorFilters(mixed $dateFromInput, mixed $dateToInput, mixed $userIdInput): array
+    {
+        $dateFrom = $this->resolveOptionalDate($dateFromInput, 'date_from');
+        $dateTo = $this->resolveOptionalDate($dateToInput, 'date_to');
+        if ($dateFrom !== null && $dateTo !== null && $dateFrom > $dateTo) {
+            throw new \InvalidArgumentException('date_from must be <= date_to');
+        }
+
+        return [
+            'date_from' => $dateFrom,
+            'date_to' => $dateTo,
+            'user_id' => $this->resolveOptionalUserId($userIdInput),
+        ];
+    }
+
+    private function resolveOptionalDate(mixed $value, string $fieldName): ?string
+    {
+        $raw = trim((string) ($value ?? ''));
+        if ($raw === '') {
+            return null;
+        }
+
+        $dt = \DateTime::createFromFormat('Y-m-d', $raw);
+        $errors = \DateTime::getLastErrors();
+        if (
+            !$dt ||
+            !is_array($errors) ||
+            ($errors['warning_count'] ?? 0) > 0 ||
+            ($errors['error_count'] ?? 0) > 0 ||
+            $dt->format('Y-m-d') !== $raw
+        ) {
+            throw new \InvalidArgumentException($fieldName . ' must be in YYYY-MM-DD format');
+        }
+
+        return $raw;
+    }
+
+    private function resolveOptionalUserId(mixed $value): ?int
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+        if (!is_numeric($value)) {
+            throw new \InvalidArgumentException('user_id must be an integer');
+        }
+
+        $userId = (int) $value;
+        if ($userId <= 0) {
+            throw new \InvalidArgumentException('user_id must be greater than 0');
+        }
+        return $userId;
     }
 }

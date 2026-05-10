@@ -133,6 +133,7 @@ $router->add('GET', '/pos/cash-sessions', [PosController::class, 'cashSessions']
 $router->add('GET', '/pos/cash-sessions/{id}/report', [PosController::class, 'cashSessionReport'], [AuthMiddleware::class, TenantMiddleware::class, new PermissionMiddleware('payments.read')]);
 $router->add('GET', '/pos/reports/z-close', [PosController::class, 'zCloseReport'], [AuthMiddleware::class, TenantMiddleware::class, new PermissionMiddleware('payments.read')]);
 $router->add('GET', '/pos/reports/z-close/export', [PosController::class, 'zCloseReportExport'], [AuthMiddleware::class, TenantMiddleware::class, new PermissionMiddleware('payments.read')]);
+$router->add('GET', '/pos/reports/cash-by-operator', [PosController::class, 'cashByOperatorReport'], [AuthMiddleware::class, TenantMiddleware::class, new PermissionMiddleware('payments.read')]);
 
 $router->add('GET', '/reminders/expirations', [ReminderController::class, 'expiringMemberships'], [new RateLimitMiddleware('reminders_read', 60, 60), AuthMiddleware::class, TenantMiddleware::class, new FeatureGateMiddleware('whatsapp_read'), new PermissionMiddleware('whatsapp.read')]);
 $router->add('POST', '/reminders/batch', [ReminderController::class, 'buildBatch'], [new RateLimitMiddleware('reminders_batch', 20, 60), AuthMiddleware::class, TenantMiddleware::class, new FeatureGateMiddleware('whatsapp_send'), new PermissionMiddleware('whatsapp.send')]);
