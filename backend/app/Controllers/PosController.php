@@ -1547,6 +1547,13 @@ final class PosController
         fputcsv($out, ['metadata', 'gym_id', (string) $gymId]);
         fputcsv($out, ['metadata', 'date_from', $dateFrom]);
         fputcsv($out, ['metadata', 'date_to', $dateTo]);
+        fputcsv($out, ['metadata', 'limit', $this->normalizeCsvValue($data['limit'] ?? null)]);
+        fputcsv($out, ['metadata', 'sort_by', $this->normalizeCsvValue($data['sort_by'] ?? null)]);
+        fputcsv($out, ['metadata', 'sort_dir', $this->normalizeCsvValue($data['sort_dir'] ?? null)]);
+        $summary = is_array($data['summary'] ?? null) ? $data['summary'] : [];
+        foreach ($summary as $k => $v) {
+            fputcsv($out, ['summary', (string) $k, $this->normalizeCsvValue($v)]);
+        }
         fputcsv($out, ['', '', '']);
 
         $rules = is_array($data['commission_rules'] ?? null) ? $data['commission_rules'] : [];
