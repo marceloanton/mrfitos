@@ -146,6 +146,44 @@ final class PosController
         }
     }
 
+    public function memberAccountFollowupUpsert(): void
+    {
+        $auth = json_decode($_SERVER['auth_user'] ?? '{}', true) ?: [];
+        try {
+            $data = $this->service->upsertMemberAccountFollowup(
+                (int) ($auth['tenant_id'] ?? 0),
+                (int) ($auth['gym_id'] ?? 0),
+                (int) ($auth['sub'] ?? 0),
+                Request::json()
+            );
+            Response::json(['success' => true, 'data' => $data]);
+        } catch (\InvalidArgumentException $e) {
+            Response::json(['success' => false, 'message' => $e->getMessage()], 422);
+        } catch (\Throwable $e) {
+            Response::json(['success' => false, 'message' => 'Failed to update member account followup'], 500);
+        }
+    }
+
+    public function memberAccountFollowupFunnelWeekly(): void
+    {
+        $auth = json_decode($_SERVER['auth_user'] ?? '{}', true) ?: [];
+        $dateFrom = Request::query('date_from', null);
+        $dateTo = Request::query('date_to', null);
+        try {
+            $data = $this->service->getMemberAccountFollowupFunnelWeekly(
+                (int) ($auth['tenant_id'] ?? 0),
+                (int) ($auth['gym_id'] ?? 0),
+                $dateFrom,
+                $dateTo
+            );
+            Response::json(['success' => true, 'data' => $data]);
+        } catch (\InvalidArgumentException $e) {
+            Response::json(['success' => false, 'message' => $e->getMessage()], 422);
+        } catch (\Throwable $e) {
+            Response::json(['success' => false, 'message' => 'Failed to fetch member account followup funnel'], 500);
+        }
+    }
+
     public function createProduct(): void
     {
         $auth = json_decode($_SERVER['auth_user'] ?? '{}', true) ?: [];

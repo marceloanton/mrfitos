@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { adjustStock, autoSettleMemberAccountCharges, closeCashSession, createPosAlertContact, createPosProduct, createPosSale, deletePosAlertContact, exportPosAlertDispatchHistoryCsv, exportPosAuditCsv, exportPosAutosettleKpiCsv, exportPosZCloseCsv, getCashByOperatorReport, getCashSessionReport, getMemberAccountAging, getMemberAccountCollectionsKpiToday, getMemberAccountOverdueWhatsAppLink, getOpenCashSessionSummary, getPosAlertNotifyLink, getPosAlerts, getPosAlertsStatus, getPosAutosettleKpi, getPosConfig, getPosSaleReceipt, getPosSaleReceiptByNumber, getPosSummary, getPosZCloseReport, listCashSessions, listLowStockProducts, listMemberAccountCharges, listPosAlertContacts, listPosAlertDispatchHistory, listPosAlertsCronHistory, listPosAudit, listPosProducts, listPosSales, listStockMovements, notifyCriticalPosAlert, openCashSession, settleMemberAccountCharge, updatePosAlertContact, updatePosConfig, voidPosSale } from '../services/posService';
+import { adjustStock, autoSettleMemberAccountCharges, closeCashSession, createPosAlertContact, createPosProduct, createPosSale, deletePosAlertContact, exportPosAlertDispatchHistoryCsv, exportPosAuditCsv, exportPosAutosettleKpiCsv, exportPosZCloseCsv, getCashByOperatorReport, getCashSessionReport, getMemberAccountAging, getMemberAccountCollectionsKpiToday, getMemberAccountFollowupFunnel, getMemberAccountOverdueWhatsAppLink, getOpenCashSessionSummary, getPosAlertNotifyLink, getPosAlerts, getPosAlertsStatus, getPosAutosettleKpi, getPosConfig, getPosSaleReceipt, getPosSaleReceiptByNumber, getPosSummary, getPosZCloseReport, listCashSessions, listLowStockProducts, listMemberAccountCharges, listPosAlertContacts, listPosAlertDispatchHistory, listPosAlertsCronHistory, listPosAudit, listPosProducts, listPosSales, listStockMovements, notifyCriticalPosAlert, openCashSession, settleMemberAccountCharge, updatePosAlertContact, updatePosConfig, upsertMemberAccountFollowup, voidPosSale } from '../services/posService';
 import { useAuthStore } from '../stores/authStore';
 
 export default function PosPage() {
@@ -90,6 +90,17 @@ export default function PosPage() {
     recovered_today_count: 0,
     recovered_today_amount: 0
   });
+  const [followupDateFrom, setFollowupDateFrom] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 6);
+    return d.toISOString().slice(0, 10);
+  });
+  const [followupDateTo, setFollowupDateTo] = useState(() => new Date().toISOString().slice(0, 10));
+  const [followupFunnel, setFollowupFunnel] = useState({
+    contacted_count: 0,
+    promise_count: 0,
+    paid_count: 0
+  });
   const [summary, setSummary] = useState({
     today_sales_count: 0,
     today_sales_total: 0,
@@ -99,7 +110,7 @@ export default function PosPage() {
 
   const load = async () => {
     try {
-      const [salesData, chargesData, productsData, movementsData, openCashData, cashSessionsData, posConfig, summaryData, lowStockData, cashByOperatorData, auditData, alertsData, contactsData, dispatchHistoryData, alertsStatusData, alertsCronHistoryData, autosettleKpiData, memberAccountAgingData, collectionsKpiData] = await Promise.all([
+      const [salesData, chargesData, productsData, movementsData, openCashData, cashSessionsData, posConfig, summaryData, lowStockData, cashByOperatorData, auditData, alertsData, contactsData, dispatchHistoryData, alertsStatusData, alertsCronHistoryData, autosettleKpiData, memberAccountAgingData, collectionsKpiData, followupFunnelData] = await Promise.all([
         listPosSales({ page: 1, per_page: 20 }),
         listMemberAccountCharges({ status: 'pending_auto_debit', page: 1, per_page: 20 }),
         listPosProducts(),
@@ -138,7 +149,11 @@ export default function PosPage() {
           date_to: autosettleDateTo || undefined
         }),
         getMemberAccountAging(),
-        getMemberAccountCollectionsKpiToday()
+        getMemberAccountCollectionsKpiToday(),
+        getMemberAccountFollowupFunnel({
+          date_from: followupDateFrom || undefined,
+          date_to: followupDateTo || undefined
+        })
       ]);
       setSales(Array.isArray(salesData?.items) ? salesData.items : []);
       setCharges(Array.isArray(chargesData?.items) ? chargesData.items : []);
@@ -186,6 +201,11 @@ export default function PosPage() {
         contacted_today_unique_members: Number(collectionsKpiData?.contacted_today_unique_members ?? 0),
         recovered_today_count: Number(collectionsKpiData?.recovered_today_count ?? 0),
         recovered_today_amount: Number(collectionsKpiData?.recovered_today_amount ?? 0)
+      });
+      setFollowupFunnel({
+        contacted_count: Number(followupFunnelData?.contacted_count ?? 0),
+        promise_count: Number(followupFunnelData?.promise_count ?? 0),
+        paid_count: Number(followupFunnelData?.paid_count ?? 0)
       });
     } catch {
       // no-op
@@ -702,6 +722,22 @@ ${sale.notes ? `Nota: ${sale.notes}` : ''}
     }
   };
 
+  const onSetFollowupStatus = async (memberId, status) => {
+    setError('');
+    try {
+      const payload = { member_id: memberId, status };
+      if (status === 'promise') {
+        const date = window.prompt('Fecha promesa (YYYY-MM-DD):', new Date().toISOString().slice(0, 10));
+        if (!date) return;
+        payload.promise_date = date;
+      }
+      await upsertMemberAccountFollowup(payload);
+      await load();
+    } catch (err) {
+      setError(err?.response?.data?.message ?? 'No se pudo actualizar estado de seguimiento.');
+    }
+  };
+
   const onCreateProduct = async () => {
     setError('');
     setMessage('');
@@ -750,6 +786,27 @@ ${sale.notes ? `Nota: ${sale.notes}` : ''}
       </div>
 
       <div className="rounded-xl bg-white p-4 shadow-sm">
+        <div className="mb-3 flex flex-wrap items-end gap-2">
+          <input className="rounded border border-slate-300 p-2 text-sm" type="date" value={followupDateFrom} onChange={(e) => setFollowupDateFrom(e.target.value)} />
+          <input className="rounded border border-slate-300 p-2 text-sm" type="date" value={followupDateTo} onChange={(e) => setFollowupDateTo(e.target.value)} />
+          <button className="rounded border border-slate-300 px-3 py-2 text-sm" onClick={load}>
+            Actualizar Embudo
+          </button>
+        </div>
+        <div className="mb-3 grid gap-2 md:grid-cols-3">
+          <div className="rounded border border-slate-200 p-2">
+            <p className="text-xs uppercase tracking-wide text-slate-500">Contactado</p>
+            <p className="text-lg font-semibold text-slate-900">{followupFunnel.contacted_count}</p>
+          </div>
+          <div className="rounded border border-slate-200 p-2">
+            <p className="text-xs uppercase tracking-wide text-slate-500">Promesa</p>
+            <p className="text-lg font-semibold text-amber-700">{followupFunnel.promise_count}</p>
+          </div>
+          <div className="rounded border border-slate-200 p-2">
+            <p className="text-xs uppercase tracking-wide text-slate-500">Cobrado</p>
+            <p className="text-lg font-semibold text-emerald-700">{followupFunnel.paid_count}</p>
+          </div>
+        </div>
         <h3 className="mb-2 text-lg font-semibold text-slate-900">Morosidad cuenta socio</h3>
         <div className="mb-3 grid gap-2 md:grid-cols-4">
           <div className="rounded border border-slate-200 p-2">
@@ -787,9 +844,18 @@ ${sale.notes ? `Nota: ${sale.notes}` : ''}
             <p className="text-sm text-slate-500">Sin deudas vencidas.</p>
           ) : memberAccountAging.top_overdue_members.map((m) => (
             <div key={m.member_id} className="flex items-center justify-between rounded border border-slate-200 p-2 text-sm">
-              <span>{m.member_code} · {m.first_name} {m.last_name} · {m.charges_count} cargos</span>
+              <span>{m.member_code} · {m.first_name} {m.last_name} · {m.charges_count} cargos · {m.followup?.status || 'sin seguimiento'}</span>
               <div className="flex items-center gap-2">
                 <span className="font-semibold text-slate-900">${Number(m.total_amount || 0).toFixed(2)} · {m.max_days_overdue} días</span>
+                <button className="rounded border border-slate-300 px-2 py-1 text-xs" onClick={() => onSetFollowupStatus(m.member_id, 'contacted')}>
+                  Contactado
+                </button>
+                <button className="rounded border border-amber-300 px-2 py-1 text-xs text-amber-700" onClick={() => onSetFollowupStatus(m.member_id, 'promise')}>
+                  Promesa
+                </button>
+                <button className="rounded border border-emerald-300 px-2 py-1 text-xs text-emerald-700" onClick={() => onSetFollowupStatus(m.member_id, 'paid')}>
+                  Cobrado
+                </button>
                 <button
                   className="rounded border border-emerald-300 px-2 py-1 text-xs text-emerald-700 disabled:opacity-50"
                   disabled={!hasPermission('whatsapp.send')}

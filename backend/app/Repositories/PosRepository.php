@@ -1824,4 +1824,67 @@ final class PosRepository
         ]);
         return $stmt->fetch() ?: [];
     }
+
+    public function upsertMemberAccountFollowup(array $data): void
+    {
+        $stmt = Database::connection()->prepare(
+            'INSERT INTO member_account_followups
+             (tenant_id, gym_id, member_id, status, promise_date, notes, created_by_user_id, updated_by_user_id, created_at, updated_at)
+             VALUES
+             (:tenant_id, :gym_id, :member_id, :status, :promise_date, :notes, :created_by_user_id, :updated_by_user_id, NOW(), NOW())
+             ON DUPLICATE KEY UPDATE
+                status = VALUES(status),
+                promise_date = VALUES(promise_date),
+                notes = VALUES(notes),
+                updated_by_user_id = VALUES(updated_by_user_id),
+                updated_at = NOW()'
+        );
+        $stmt->execute($data);
+    }
+
+    public function listMemberAccountFollowupsByMemberIds(int $tenantId, int $gymId, array $memberIds): array
+    {
+        if ($memberIds === []) {
+            return [];
+        }
+        $memberIds = array_values(array_unique(array_map('intval', $memberIds)));
+        $memberIds = array_values(array_filter($memberIds, static fn (int $id): bool => $id > 0));
+        if ($memberIds === []) {
+            return [];
+        }
+        $placeholders = implode(',', array_fill(0, count($memberIds), '?'));
+        $sql = "SELECT member_id, status, promise_date, notes, updated_at
+                FROM member_account_followups
+                WHERE tenant_id = ?
+                  AND gym_id = ?
+                  AND member_id IN ({$placeholders})";
+        $stmt = Database::connection()->prepare($sql);
+        $params = array_merge([$tenantId, $gymId], $memberIds);
+        $stmt->execute($params);
+        return $stmt->fetchAll() ?: [];
+    }
+
+    public function getMemberAccountFollowupFunnel(int $tenantId, int $gymId, string $dateFrom, string $dateTo): array
+    {
+        $from = $dateFrom . ' 00:00:00';
+        $to = $dateTo . ' 23:59:59';
+        $stmt = Database::connection()->prepare(
+            'SELECT
+                COALESCE(SUM(CASE WHEN status = "contacted" THEN 1 ELSE 0 END), 0) AS contacted_count,
+                COALESCE(SUM(CASE WHEN status = "promise" THEN 1 ELSE 0 END), 0) AS promise_count,
+                COALESCE(SUM(CASE WHEN status = "paid" THEN 1 ELSE 0 END), 0) AS paid_count
+             FROM member_account_followups
+             WHERE tenant_id = :tenant_id
+               AND gym_id = :gym_id
+               AND updated_at >= :from_dt
+               AND updated_at <= :to_dt'
+        );
+        $stmt->execute([
+            'tenant_id' => $tenantId,
+            'gym_id' => $gymId,
+            'from_dt' => $from,
+            'to_dt' => $to,
+        ]);
+        return $stmt->fetch() ?: [];
+    }
 }

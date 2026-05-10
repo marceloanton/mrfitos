@@ -127,6 +127,21 @@ final class PosService
     {
         $summary = $this->repo->getMemberAccountAgingSummary($tenantId, $gymId);
         $topMembers = $this->repo->listTopOverdueMemberAccountMembers($tenantId, $gymId, 10);
+        $memberIds = array_map(static fn (array $row): int => (int) ($row['member_id'] ?? 0), $topMembers);
+        $followups = $this->repo->listMemberAccountFollowupsByMemberIds($tenantId, $gymId, $memberIds);
+        $followupByMember = [];
+        foreach ($followups as $f) {
+            $mid = (int) ($f['member_id'] ?? 0);
+            if ($mid <= 0) {
+                continue;
+            }
+            $followupByMember[$mid] = [
+                'status' => (string) ($f['status'] ?? ''),
+                'promise_date' => (string) ($f['promise_date'] ?? ''),
+                'notes' => (string) ($f['notes'] ?? ''),
+                'updated_at' => (string) ($f['updated_at'] ?? ''),
+            ];
+        }
 
         $buckets = [
             [
@@ -181,7 +196,92 @@ final class PosService
                 'total_amount' => (float) ($row['total_amount'] ?? 0),
                 'oldest_due_date' => (string) ($row['oldest_due_date'] ?? ''),
                 'max_days_overdue' => (int) ($row['max_days_overdue'] ?? 0),
+                'followup' => $followupByMember[(int) ($row['member_id'] ?? 0)] ?? null,
             ], $topMembers),
+        ];
+    }
+
+    public function upsertMemberAccountFollowup(int $tenantId, int $gymId, int $userId, array $input): array
+    {
+        $memberId = (int) ($input['member_id'] ?? 0);
+        $status = strtolower(trim((string) ($input['status'] ?? '')));
+        $promiseDate = trim((string) ($input['promise_date'] ?? ''));
+        $notes = trim((string) ($input['notes'] ?? ''));
+
+        if ($memberId <= 0) {
+            throw new \InvalidArgumentException('member_id is required');
+        }
+        if (!in_array($status, ['contacted', 'promise', 'paid'], true)) {
+            throw new \InvalidArgumentException('Invalid status');
+        }
+        if ($status === 'promise' && $promiseDate === '') {
+            throw new \InvalidArgumentException('promise_date is required for promise status');
+        }
+        if ($promiseDate !== '') {
+            $promiseDate = $this->resolveReportDate($promiseDate);
+        } else {
+            $promiseDate = null;
+        }
+
+        $this->repo->upsertMemberAccountFollowup([
+            'tenant_id' => $tenantId,
+            'gym_id' => $gymId,
+            'member_id' => $memberId,
+            'status' => $status,
+            'promise_date' => $promiseDate,
+            'notes' => $notes !== '' ? substr($notes, 0, 255) : null,
+            'created_by_user_id' => $userId > 0 ? $userId : null,
+            'updated_by_user_id' => $userId > 0 ? $userId : null,
+        ]);
+
+        $this->activity->create([
+            'tenant_id' => $tenantId,
+            'gym_id' => $gymId,
+            'user_id' => $userId > 0 ? $userId : null,
+            'entity_type' => 'member',
+            'entity_id' => $memberId,
+            'action' => 'pos_member_account_followup_updated',
+            'metadata' => [
+                'member_id' => $memberId,
+                'status' => $status,
+                'promise_date' => $promiseDate,
+                'notes' => $notes,
+            ],
+            'ip_address' => $_SERVER['REMOTE_ADDR'] ?? null,
+            'user_agent' => $_SERVER['HTTP_USER_AGENT'] ?? null,
+        ]);
+
+        return [
+            'member_id' => $memberId,
+            'status' => $status,
+            'promise_date' => $promiseDate,
+            'notes' => $notes,
+        ];
+    }
+
+    public function getMemberAccountFollowupFunnelWeekly(int $tenantId, int $gymId, mixed $dateFromInput, mixed $dateToInput): array
+    {
+        $dateFrom = $this->resolveOptionalDate($dateFromInput, 'date_from');
+        $dateTo = $this->resolveOptionalDate($dateToInput, 'date_to');
+        if ($dateFrom === null && $dateTo === null) {
+            $dateTo = date('Y-m-d');
+            $dateFrom = date('Y-m-d', strtotime('-6 days'));
+        } elseif ($dateFrom === null) {
+            $dateFrom = $dateTo;
+        } elseif ($dateTo === null) {
+            $dateTo = $dateFrom;
+        }
+        if ($dateFrom > $dateTo) {
+            throw new \InvalidArgumentException('date_from must be <= date_to');
+        }
+
+        $row = $this->repo->getMemberAccountFollowupFunnel($tenantId, $gymId, $dateFrom, $dateTo);
+        return [
+            'date_from' => $dateFrom,
+            'date_to' => $dateTo,
+            'contacted_count' => (int) ($row['contacted_count'] ?? 0),
+            'promise_count' => (int) ($row['promise_count'] ?? 0),
+            'paid_count' => (int) ($row['paid_count'] ?? 0),
         ];
     }
 

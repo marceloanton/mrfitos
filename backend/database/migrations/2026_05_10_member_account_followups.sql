@@ -1,0 +1,21 @@
+CREATE TABLE IF NOT EXISTS member_account_followups (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    tenant_id BIGINT UNSIGNED NOT NULL,
+    gym_id BIGINT UNSIGNED NOT NULL,
+    member_id BIGINT UNSIGNED NOT NULL,
+    status ENUM('contacted','promise','paid') NOT NULL,
+    promise_date DATE NULL,
+    notes VARCHAR(255) NULL,
+    created_by_user_id BIGINT UNSIGNED NULL,
+    updated_by_user_id BIGINT UNSIGNED NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT fk_maf_tenant FOREIGN KEY (tenant_id) REFERENCES tenants(id),
+    CONSTRAINT fk_maf_gym FOREIGN KEY (gym_id) REFERENCES gyms(id),
+    CONSTRAINT fk_maf_member FOREIGN KEY (member_id) REFERENCES members(id),
+    CONSTRAINT fk_maf_created_by FOREIGN KEY (created_by_user_id) REFERENCES users(id),
+    CONSTRAINT fk_maf_updated_by FOREIGN KEY (updated_by_user_id) REFERENCES users(id),
+    UNIQUE KEY uk_maf_scope_member (tenant_id, gym_id, member_id),
+    KEY idx_maf_scope_status_updated (tenant_id, gym_id, status, updated_at),
+    KEY idx_maf_promise_date (tenant_id, gym_id, promise_date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
