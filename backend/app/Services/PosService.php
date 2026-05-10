@@ -123,6 +123,67 @@ final class PosService
         ];
     }
 
+    public function getMemberAccountAging(int $tenantId, int $gymId): array
+    {
+        $summary = $this->repo->getMemberAccountAgingSummary($tenantId, $gymId);
+        $topMembers = $this->repo->listTopOverdueMemberAccountMembers($tenantId, $gymId, 10);
+
+        $buckets = [
+            [
+                'code' => '0_7',
+                'label' => '0-7 días',
+                'count' => (int) ($summary['bucket_0_7_count'] ?? 0),
+                'amount' => (float) ($summary['bucket_0_7_amount'] ?? 0),
+            ],
+            [
+                'code' => '8_15',
+                'label' => '8-15 días',
+                'count' => (int) ($summary['bucket_8_15_count'] ?? 0),
+                'amount' => (float) ($summary['bucket_8_15_amount'] ?? 0),
+            ],
+            [
+                'code' => '16_30',
+                'label' => '16-30 días',
+                'count' => (int) ($summary['bucket_16_30_count'] ?? 0),
+                'amount' => (float) ($summary['bucket_16_30_amount'] ?? 0),
+            ],
+            [
+                'code' => '30_plus',
+                'label' => '30+ días',
+                'count' => (int) ($summary['bucket_30_plus_count'] ?? 0),
+                'amount' => (float) ($summary['bucket_30_plus_amount'] ?? 0),
+            ],
+        ];
+
+        $overdueCount = 0;
+        $overdueAmount = 0.0;
+        foreach ($buckets as $bucket) {
+            $overdueCount += (int) $bucket['count'];
+            $overdueAmount += (float) $bucket['amount'];
+        }
+
+        return [
+            'today' => date('Y-m-d'),
+            'overdue_total_count' => $overdueCount,
+            'overdue_total_amount' => $overdueAmount,
+            'not_due_count' => (int) ($summary['not_due_count'] ?? 0),
+            'not_due_amount' => (float) ($summary['not_due_amount'] ?? 0),
+            'no_due_count' => (int) ($summary['no_due_count'] ?? 0),
+            'no_due_amount' => (float) ($summary['no_due_amount'] ?? 0),
+            'buckets' => $buckets,
+            'top_overdue_members' => array_map(static fn (array $row): array => [
+                'member_id' => (int) ($row['member_id'] ?? 0),
+                'member_code' => (string) ($row['member_code'] ?? ''),
+                'first_name' => (string) ($row['first_name'] ?? ''),
+                'last_name' => (string) ($row['last_name'] ?? ''),
+                'charges_count' => (int) ($row['charges_count'] ?? 0),
+                'total_amount' => (float) ($row['total_amount'] ?? 0),
+                'oldest_due_date' => (string) ($row['oldest_due_date'] ?? ''),
+                'max_days_overdue' => (int) ($row['max_days_overdue'] ?? 0),
+            ], $topMembers),
+        ];
+    }
+
     public function createProduct(int $tenantId, int $gymId, array $input): int
     {
         $name = trim((string) ($input['name'] ?? ''));

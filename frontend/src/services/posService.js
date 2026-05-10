@@ -78,6 +78,11 @@ export async function listMemberAccountCharges(params = {}) {
   return payload(data);
 }
 
+export async function getMemberAccountAging() {
+  const { data } = await api.get('/pos/member-account/aging');
+  return payload(data);
+}
+
 export async function settleMemberAccountCharge(id, body = {}) {
   const { data } = await api.post(`/pos/member-account/charges/${id}/settle`, body);
   return payload(data);

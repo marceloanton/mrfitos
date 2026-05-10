@@ -1702,4 +1702,62 @@ final class PosRepository
 
         return $stmt->fetchAll() ?: [];
     }
+
+    public function getMemberAccountAgingSummary(int $tenantId, int $gymId): array
+    {
+        $stmt = Database::connection()->prepare(
+            'SELECT
+                COALESCE(SUM(CASE WHEN due_date IS NULL THEN amount ELSE 0 END), 0) AS no_due_amount,
+                SUM(CASE WHEN due_date IS NULL THEN 1 ELSE 0 END) AS no_due_count,
+                COALESCE(SUM(CASE WHEN due_date > CURDATE() THEN amount ELSE 0 END), 0) AS not_due_amount,
+                SUM(CASE WHEN due_date > CURDATE() THEN 1 ELSE 0 END) AS not_due_count,
+                COALESCE(SUM(CASE WHEN due_date <= CURDATE() AND DATEDIFF(CURDATE(), due_date) BETWEEN 0 AND 7 THEN amount ELSE 0 END), 0) AS bucket_0_7_amount,
+                SUM(CASE WHEN due_date <= CURDATE() AND DATEDIFF(CURDATE(), due_date) BETWEEN 0 AND 7 THEN 1 ELSE 0 END) AS bucket_0_7_count,
+                COALESCE(SUM(CASE WHEN due_date <= CURDATE() AND DATEDIFF(CURDATE(), due_date) BETWEEN 8 AND 15 THEN amount ELSE 0 END), 0) AS bucket_8_15_amount,
+                SUM(CASE WHEN due_date <= CURDATE() AND DATEDIFF(CURDATE(), due_date) BETWEEN 8 AND 15 THEN 1 ELSE 0 END) AS bucket_8_15_count,
+                COALESCE(SUM(CASE WHEN due_date <= CURDATE() AND DATEDIFF(CURDATE(), due_date) BETWEEN 16 AND 30 THEN amount ELSE 0 END), 0) AS bucket_16_30_amount,
+                SUM(CASE WHEN due_date <= CURDATE() AND DATEDIFF(CURDATE(), due_date) BETWEEN 16 AND 30 THEN 1 ELSE 0 END) AS bucket_16_30_count,
+                COALESCE(SUM(CASE WHEN due_date <= CURDATE() AND DATEDIFF(CURDATE(), due_date) > 30 THEN amount ELSE 0 END), 0) AS bucket_30_plus_amount,
+                SUM(CASE WHEN due_date <= CURDATE() AND DATEDIFF(CURDATE(), due_date) > 30 THEN 1 ELSE 0 END) AS bucket_30_plus_count
+             FROM member_account_charges
+             WHERE tenant_id = :tenant_id
+               AND gym_id = :gym_id
+               AND status = "pending_auto_debit"'
+        );
+        $stmt->execute([
+            'tenant_id' => $tenantId,
+            'gym_id' => $gymId,
+        ]);
+        return $stmt->fetch() ?: [];
+    }
+
+    public function listTopOverdueMemberAccountMembers(int $tenantId, int $gymId, int $limit = 10): array
+    {
+        $stmt = Database::connection()->prepare(
+            'SELECT
+                c.member_id,
+                m.member_code,
+                m.first_name,
+                m.last_name,
+                COUNT(*) AS charges_count,
+                COALESCE(SUM(c.amount), 0) AS total_amount,
+                MIN(c.due_date) AS oldest_due_date,
+                MAX(DATEDIFF(CURDATE(), c.due_date)) AS max_days_overdue
+             FROM member_account_charges c
+             INNER JOIN members m ON m.id = c.member_id
+             WHERE c.tenant_id = :tenant_id
+               AND c.gym_id = :gym_id
+               AND c.status = "pending_auto_debit"
+               AND c.due_date IS NOT NULL
+               AND c.due_date <= CURDATE()
+             GROUP BY c.member_id, m.member_code, m.first_name, m.last_name
+             ORDER BY total_amount DESC, max_days_overdue DESC
+             LIMIT :limit'
+        );
+        $stmt->bindValue(':tenant_id', $tenantId, \PDO::PARAM_INT);
+        $stmt->bindValue(':gym_id', $gymId, \PDO::PARAM_INT);
+        $stmt->bindValue(':limit', $limit, \PDO::PARAM_INT);
+        $stmt->execute();
+        return $stmt->fetchAll() ?: [];
+    }
 }

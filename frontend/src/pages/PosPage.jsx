@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { adjustStock, autoSettleMemberAccountCharges, closeCashSession, createPosAlertContact, createPosProduct, createPosSale, deletePosAlertContact, exportPosAlertDispatchHistoryCsv, exportPosAuditCsv, exportPosAutosettleKpiCsv, exportPosZCloseCsv, getCashByOperatorReport, getCashSessionReport, getOpenCashSessionSummary, getPosAlertNotifyLink, getPosAlerts, getPosAlertsStatus, getPosAutosettleKpi, getPosConfig, getPosSaleReceipt, getPosSaleReceiptByNumber, getPosSummary, getPosZCloseReport, listCashSessions, listLowStockProducts, listMemberAccountCharges, listPosAlertContacts, listPosAlertDispatchHistory, listPosAlertsCronHistory, listPosAudit, listPosProducts, listPosSales, listStockMovements, notifyCriticalPosAlert, openCashSession, settleMemberAccountCharge, updatePosAlertContact, updatePosConfig, voidPosSale } from '../services/posService';
+import { adjustStock, autoSettleMemberAccountCharges, closeCashSession, createPosAlertContact, createPosProduct, createPosSale, deletePosAlertContact, exportPosAlertDispatchHistoryCsv, exportPosAuditCsv, exportPosAutosettleKpiCsv, exportPosZCloseCsv, getCashByOperatorReport, getCashSessionReport, getMemberAccountAging, getOpenCashSessionSummary, getPosAlertNotifyLink, getPosAlerts, getPosAlertsStatus, getPosAutosettleKpi, getPosConfig, getPosSaleReceipt, getPosSaleReceiptByNumber, getPosSummary, getPosZCloseReport, listCashSessions, listLowStockProducts, listMemberAccountCharges, listPosAlertContacts, listPosAlertDispatchHistory, listPosAlertsCronHistory, listPosAudit, listPosProducts, listPosSales, listStockMovements, notifyCriticalPosAlert, openCashSession, settleMemberAccountCharge, updatePosAlertContact, updatePosConfig, voidPosSale } from '../services/posService';
 import { useAuthStore } from '../stores/authStore';
 
 export default function PosPage() {
@@ -78,6 +78,12 @@ export default function PosPage() {
     failed_total: 0,
     settled_amount_total: 0
   });
+  const [memberAccountAging, setMemberAccountAging] = useState({
+    overdue_total_count: 0,
+    overdue_total_amount: 0,
+    buckets: [],
+    top_overdue_members: []
+  });
   const [summary, setSummary] = useState({
     today_sales_count: 0,
     today_sales_total: 0,
@@ -87,7 +93,7 @@ export default function PosPage() {
 
   const load = async () => {
     try {
-      const [salesData, chargesData, productsData, movementsData, openCashData, cashSessionsData, posConfig, summaryData, lowStockData, cashByOperatorData, auditData, alertsData, contactsData, dispatchHistoryData, alertsStatusData, alertsCronHistoryData, autosettleKpiData] = await Promise.all([
+      const [salesData, chargesData, productsData, movementsData, openCashData, cashSessionsData, posConfig, summaryData, lowStockData, cashByOperatorData, auditData, alertsData, contactsData, dispatchHistoryData, alertsStatusData, alertsCronHistoryData, autosettleKpiData, memberAccountAgingData] = await Promise.all([
         listPosSales({ page: 1, per_page: 20 }),
         listMemberAccountCharges({ status: 'pending_auto_debit', page: 1, per_page: 20 }),
         listPosProducts(),
@@ -124,7 +130,8 @@ export default function PosPage() {
         getPosAutosettleKpi({
           date_from: autosettleDateFrom || undefined,
           date_to: autosettleDateTo || undefined
-        })
+        }),
+        getMemberAccountAging()
       ]);
       setSales(Array.isArray(salesData?.items) ? salesData.items : []);
       setCharges(Array.isArray(chargesData?.items) ? chargesData.items : []);
@@ -160,6 +167,12 @@ export default function PosPage() {
         settled_total: Number(autosettleKpiData?.settled_total ?? 0),
         failed_total: Number(autosettleKpiData?.failed_total ?? 0),
         settled_amount_total: Number(autosettleKpiData?.settled_amount_total ?? 0)
+      });
+      setMemberAccountAging({
+        overdue_total_count: Number(memberAccountAgingData?.overdue_total_count ?? 0),
+        overdue_total_amount: Number(memberAccountAgingData?.overdue_total_amount ?? 0),
+        buckets: Array.isArray(memberAccountAgingData?.buckets) ? memberAccountAgingData.buckets : [],
+        top_overdue_members: Array.isArray(memberAccountAgingData?.top_overdue_members) ? memberAccountAgingData.top_overdue_members : []
       });
     } catch {
       // no-op
@@ -707,6 +720,33 @@ ${sale.notes ? `Nota: ${sale.notes}` : ''}
       <div className="rounded-xl bg-white p-4 shadow-sm">
         <h2 className="text-2xl font-semibold text-slate-900">POS Gym</h2>
         <p className="text-sm text-slate-600">Venta en mostrador: cobro inmediato, efectivo o cuenta del socio para débito automático.</p>
+      </div>
+
+      <div className="rounded-xl bg-white p-4 shadow-sm">
+        <h3 className="mb-2 text-lg font-semibold text-slate-900">Morosidad cuenta socio</h3>
+        <p className="mb-3 text-sm text-slate-600">
+          Vencido total: <strong>{memberAccountAging.overdue_total_count}</strong> cargos · <strong>${memberAccountAging.overdue_total_amount.toFixed(2)}</strong>
+        </p>
+        <div className="grid gap-2 md:grid-cols-4">
+          {memberAccountAging.buckets.map((b) => (
+            <div key={b.code} className="rounded border border-slate-200 p-3">
+              <p className="text-xs uppercase tracking-wide text-slate-500">{b.label}</p>
+              <p className="text-xl font-semibold text-slate-900">${Number(b.amount || 0).toFixed(2)}</p>
+              <p className="text-xs text-slate-500">{Number(b.count || 0)} cargos</p>
+            </div>
+          ))}
+        </div>
+        <div className="mt-3 space-y-2">
+          <p className="text-sm font-medium text-slate-700">Top socios deudores</p>
+          {memberAccountAging.top_overdue_members.length === 0 ? (
+            <p className="text-sm text-slate-500">Sin deudas vencidas.</p>
+          ) : memberAccountAging.top_overdue_members.map((m) => (
+            <div key={m.member_id} className="flex items-center justify-between rounded border border-slate-200 p-2 text-sm">
+              <span>{m.member_code} · {m.first_name} {m.last_name} · {m.charges_count} cargos</span>
+              <span className="font-semibold text-slate-900">${Number(m.total_amount || 0).toFixed(2)} · {m.max_days_overdue} días</span>
+            </div>
+          ))}
+        </div>
       </div>
 
       <div className="grid gap-3 md:grid-cols-4">
