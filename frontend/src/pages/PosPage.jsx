@@ -4,6 +4,7 @@ import { useAuthStore } from '../stores/authStore';
 
 export default function PosPage() {
   const hasPermission = useAuthStore((s) => s.hasPermission);
+  const user = useAuthStore((s) => s.user);
   const canSaleCreate = hasPermission('pos.sale.create') || hasPermission('payments.write');
   const canProductManage = hasPermission('pos.product.manage') || hasPermission('payments.write');
   const canStockManage = hasPermission('pos.stock.manage') || hasPermission('payments.write');
@@ -125,6 +126,9 @@ export default function PosPage() {
     today_cash_collected: 0,
     pending_member_account_total: 0
   });
+  const collectorPrefsStorageKey = user
+    ? `pos-collector-ranking-prefs-v1:${user.id || user.email || 'user'}:${user.gym_id || 'gym'}`
+    : null;
   const toFriendlyApiError = (err, fallbackMessage) => {
     const apiMessage = err?.response?.data?.message;
     if (apiMessage === 'date range must be <= 92 days') {
@@ -294,6 +298,31 @@ export default function PosPage() {
       setError(toFriendlyApiError(err, 'No se pudieron actualizar los indicadores de seguimiento.'));
     }
   };
+
+  useEffect(() => {
+    if (!collectorPrefsStorageKey) return;
+    try {
+      const raw = localStorage.getItem(collectorPrefsStorageKey);
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      if (parsed && ['10', '25', '50'].includes(String(parsed.limit ?? ''))) {
+        setCollectorRankingLimit(String(parsed.limit));
+      }
+      if (parsed && ['recovered_amount', 'response_rate', 'contacts_count'].includes(String(parsed.sort_by ?? ''))) {
+        setCollectorRankingSortBy(String(parsed.sort_by));
+      }
+    } catch {
+      // ignore broken local preferences
+    }
+  }, [collectorPrefsStorageKey]);
+
+  useEffect(() => {
+    if (!collectorPrefsStorageKey) return;
+    localStorage.setItem(collectorPrefsStorageKey, JSON.stringify({
+      limit: collectorRankingLimit,
+      sort_by: collectorRankingSortBy
+    }));
+  }, [collectorPrefsStorageKey, collectorRankingLimit, collectorRankingSortBy]);
 
   const onAdjustStock = async () => {
     setError('');
