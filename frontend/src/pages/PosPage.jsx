@@ -53,7 +53,7 @@ export default function PosPage() {
     difference_threshold: '0',
     voids_threshold: '3'
   });
-  const [posAlerts, setPosAlerts] = useState({ high_cash_differences: [], unusual_voids_by_operator: [] });
+  const [posAlerts, setPosAlerts] = useState({ summary: null, high_cash_differences: [], unusual_voids_by_operator: [] });
   const [summary, setSummary] = useState({
     today_sales_count: 0,
     today_sales_total: 0,
@@ -109,6 +109,7 @@ export default function PosPage() {
       });
       setAuditRows(Array.isArray(auditData?.items) ? auditData.items : []);
       setPosAlerts({
+        summary: alertsData?.summary ?? null,
         high_cash_differences: Array.isArray(alertsData?.high_cash_differences) ? alertsData.high_cash_differences : [],
         unusual_voids_by_operator: Array.isArray(alertsData?.unusual_voids_by_operator) ? alertsData.unusual_voids_by_operator : []
       });
@@ -868,6 +869,19 @@ ${sale.notes ? `Nota: ${sale.notes}` : ''}
             Actualizar alertas
           </button>
         </div>
+        {posAlerts?.summary && (
+          <div
+            className={
+              posAlerts.summary.level === 'critical'
+                ? 'mb-3 rounded border border-rose-300 bg-rose-50 p-2 text-sm text-rose-900'
+                : posAlerts.summary.level === 'warn'
+                  ? 'mb-3 rounded border border-amber-300 bg-amber-50 p-2 text-sm text-amber-900'
+                  : 'mb-3 rounded border border-emerald-300 bg-emerald-50 p-2 text-sm text-emerald-900'
+            }
+          >
+            <strong>{String(posAlerts.summary.level || 'ok').toUpperCase()}</strong> · {posAlerts.summary.message}
+          </div>
+        )}
         <div className="mb-3 grid gap-2 md:grid-cols-4">
           <input className="rounded border border-slate-300 p-2 text-sm" type="date" value={alertFilters.date_from} onChange={(e) => setAlertFilters((s) => ({ ...s, date_from: e.target.value }))} />
           <input className="rounded border border-slate-300 p-2 text-sm" type="date" value={alertFilters.date_to} onChange={(e) => setAlertFilters((s) => ({ ...s, date_to: e.target.value }))} />

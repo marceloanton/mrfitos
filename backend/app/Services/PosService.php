@@ -716,19 +716,42 @@ final class PosService
             $filters['voids_threshold']
         );
 
+        $highCashDifferences = array_map(static fn (array $row): array => [
+            'cash_session_id' => (int) ($row['cash_session_id'] ?? 0),
+            'user_id' => isset($row['user_id']) ? (int) $row['user_id'] : null,
+            'opened_at' => (string) ($row['opened_at'] ?? ''),
+            'closed_at' => (string) ($row['closed_at'] ?? ''),
+            'difference_amount' => (float) ($row['difference_amount'] ?? 0),
+        ], $cashRows);
+
+        $unusualVoidsByOperator = array_map(static fn (array $row): array => [
+            'user_id' => (int) ($row['user_id'] ?? 0),
+            'void_count' => (int) ($row['void_count'] ?? 0),
+        ], $voidRows);
+
+        $highCashDifferencesCount = count($highCashDifferences);
+        $unusualVoidOperatorsCount = count($unusualVoidsByOperator);
+
+        $level = 'ok';
+        $message = 'Sin alertas operativas críticas';
+        if ($highCashDifferencesCount >= 3 || $unusualVoidOperatorsCount >= 2) {
+            $level = 'critical';
+            $message = 'Riesgo operativo alto: revisar cajas y anulaciones';
+        } elseif ($highCashDifferencesCount >= 1 || $unusualVoidOperatorsCount >= 1) {
+            $level = 'warn';
+            $message = 'Hay alertas operativas para revisar';
+        }
+
         return [
             'filters' => $filters,
-            'high_cash_differences' => array_map(static fn (array $row): array => [
-                'cash_session_id' => (int) ($row['cash_session_id'] ?? 0),
-                'user_id' => isset($row['user_id']) ? (int) $row['user_id'] : null,
-                'opened_at' => (string) ($row['opened_at'] ?? ''),
-                'closed_at' => (string) ($row['closed_at'] ?? ''),
-                'difference_amount' => (float) ($row['difference_amount'] ?? 0),
-            ], $cashRows),
-            'unusual_voids_by_operator' => array_map(static fn (array $row): array => [
-                'user_id' => (int) ($row['user_id'] ?? 0),
-                'void_count' => (int) ($row['void_count'] ?? 0),
-            ], $voidRows),
+            'high_cash_differences' => $highCashDifferences,
+            'unusual_voids_by_operator' => $unusualVoidsByOperator,
+            'summary' => [
+                'high_cash_differences_count' => $highCashDifferencesCount,
+                'unusual_void_operators_count' => $unusualVoidOperatorsCount,
+                'level' => $level,
+                'message' => $message,
+            ],
         ];
     }
 
