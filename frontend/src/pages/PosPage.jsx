@@ -172,6 +172,7 @@ export default function PosPage() {
     setFollowupDateTo(to.toISOString().slice(0, 10));
     setError('');
   };
+  const collectorLeadLabel = collectorRankingSortDir === 'asc' ? 'Primer cobrador' : 'Top cobrador';
 
   const load = async () => {
     if (!validateFollowupRange()) {
@@ -1101,7 +1102,7 @@ ${sale.notes ? `Nota: ${sale.notes}` : ''}
               <p className="text-lg font-semibold text-amber-700">${collectorRankingSummary.total_commission_amount.toFixed(2)}</p>
             </div>
             <div className="rounded border border-slate-200 p-2">
-              <p className="text-xs text-slate-500">Top cobrador</p>
+              <p className="text-xs text-slate-500">{collectorLeadLabel}</p>
               <p className="text-sm font-semibold text-slate-900">{collectorRankingSummary.top_collector_name || '-'}</p>
               <p className="text-xs text-slate-500">${collectorRankingSummary.top_collector_recovered_amount.toFixed(2)} · {collectorRankingSummary.total_contacts_count} contactos</p>
             </div>
