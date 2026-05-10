@@ -90,6 +90,11 @@ export async function getMemberAccountOverdueWhatsAppLink(memberId) {
   return payload(data);
 }
 
+export async function getMemberAccountCollectionsKpiToday() {
+  const { data } = await api.get('/pos/member-account/collections-kpi-today');
+  return payload(data);
+}
+
 export async function settleMemberAccountCharge(id, body = {}) {
   const { data } = await api.post(`/pos/member-account/charges/${id}/settle`, body);
   return payload(data);

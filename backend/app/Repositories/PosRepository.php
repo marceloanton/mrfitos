@@ -1797,4 +1797,31 @@ final class PosRepository
         $row = $stmt->fetch();
         return $row ?: null;
     }
+
+    public function getMemberAccountCollectionsKpiToday(int $tenantId, int $gymId): array
+    {
+        $from = date('Y-m-d') . ' 00:00:00';
+        $to = date('Y-m-d') . ' 23:59:59';
+
+        $stmt = Database::connection()->prepare(
+            'SELECT
+                COALESCE(SUM(CASE WHEN action = "pos_member_account_overdue_whatsapp_opened" THEN 1 ELSE 0 END), 0) AS contacted_today_count,
+                COALESCE(COUNT(DISTINCT CASE WHEN action = "pos_member_account_overdue_whatsapp_opened" THEN JSON_UNQUOTE(JSON_EXTRACT(metadata, "$.member_id")) END), 0) AS contacted_today_unique_members,
+                COALESCE(SUM(CASE WHEN action = "pos_member_account_charge_settled" AND JSON_UNQUOTE(JSON_EXTRACT(metadata, "$.source")) IN ("manual", "manual_batch", "cron_single", "cron_bulk") THEN 1 ELSE 0 END), 0) AS recovered_today_count,
+                COALESCE(SUM(CASE WHEN action = "pos_member_account_charge_settled" AND JSON_UNQUOTE(JSON_EXTRACT(metadata, "$.source")) IN ("manual", "manual_batch", "cron_single", "cron_bulk") THEN CAST(JSON_UNQUOTE(JSON_EXTRACT(metadata, "$.amount")) AS DECIMAL(12,2)) ELSE 0 END), 0) AS recovered_today_amount
+             FROM activity_logs
+             WHERE tenant_id = :tenant_id
+               AND gym_id = :gym_id
+               AND created_at >= :from_dt
+               AND created_at <= :to_dt
+               AND action IN ("pos_member_account_overdue_whatsapp_opened", "pos_member_account_charge_settled")'
+        );
+        $stmt->execute([
+            'tenant_id' => $tenantId,
+            'gym_id' => $gymId,
+            'from_dt' => $from,
+            'to_dt' => $to,
+        ]);
+        return $stmt->fetch() ?: [];
+    }
 }

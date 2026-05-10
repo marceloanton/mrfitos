@@ -119,13 +119,30 @@ final class PosController
             $data = $this->service->buildMemberOverdueWhatsAppLink(
                 (int) ($auth['tenant_id'] ?? 0),
                 (int) ($auth['gym_id'] ?? 0),
-                $memberId
+                $memberId,
+                (int) ($auth['sub'] ?? 0)
             );
             Response::json(['success' => true, 'data' => $data]);
         } catch (\InvalidArgumentException $e) {
             Response::json(['success' => false, 'message' => $e->getMessage()], 422);
         } catch (\Throwable $e) {
             Response::json(['success' => false, 'message' => 'Failed to build overdue WhatsApp link'], 500);
+        }
+    }
+
+    public function memberAccountCollectionsKpiToday(): void
+    {
+        $auth = json_decode($_SERVER['auth_user'] ?? '{}', true) ?: [];
+        try {
+            $data = $this->service->getMemberAccountCollectionsKpiToday(
+                (int) ($auth['tenant_id'] ?? 0),
+                (int) ($auth['gym_id'] ?? 0)
+            );
+            Response::json(['success' => true, 'data' => $data]);
+        } catch (\InvalidArgumentException $e) {
+            Response::json(['success' => false, 'message' => $e->getMessage()], 422);
+        } catch (\Throwable $e) {
+            Response::json(['success' => false, 'message' => 'Failed to fetch member account collections KPI'], 500);
         }
     }
 

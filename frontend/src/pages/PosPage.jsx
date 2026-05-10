@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { adjustStock, autoSettleMemberAccountCharges, closeCashSession, createPosAlertContact, createPosProduct, createPosSale, deletePosAlertContact, exportPosAlertDispatchHistoryCsv, exportPosAuditCsv, exportPosAutosettleKpiCsv, exportPosZCloseCsv, getCashByOperatorReport, getCashSessionReport, getMemberAccountAging, getMemberAccountOverdueWhatsAppLink, getOpenCashSessionSummary, getPosAlertNotifyLink, getPosAlerts, getPosAlertsStatus, getPosAutosettleKpi, getPosConfig, getPosSaleReceipt, getPosSaleReceiptByNumber, getPosSummary, getPosZCloseReport, listCashSessions, listLowStockProducts, listMemberAccountCharges, listPosAlertContacts, listPosAlertDispatchHistory, listPosAlertsCronHistory, listPosAudit, listPosProducts, listPosSales, listStockMovements, notifyCriticalPosAlert, openCashSession, settleMemberAccountCharge, updatePosAlertContact, updatePosConfig, voidPosSale } from '../services/posService';
+import { adjustStock, autoSettleMemberAccountCharges, closeCashSession, createPosAlertContact, createPosProduct, createPosSale, deletePosAlertContact, exportPosAlertDispatchHistoryCsv, exportPosAuditCsv, exportPosAutosettleKpiCsv, exportPosZCloseCsv, getCashByOperatorReport, getCashSessionReport, getMemberAccountAging, getMemberAccountCollectionsKpiToday, getMemberAccountOverdueWhatsAppLink, getOpenCashSessionSummary, getPosAlertNotifyLink, getPosAlerts, getPosAlertsStatus, getPosAutosettleKpi, getPosConfig, getPosSaleReceipt, getPosSaleReceiptByNumber, getPosSummary, getPosZCloseReport, listCashSessions, listLowStockProducts, listMemberAccountCharges, listPosAlertContacts, listPosAlertDispatchHistory, listPosAlertsCronHistory, listPosAudit, listPosProducts, listPosSales, listStockMovements, notifyCriticalPosAlert, openCashSession, settleMemberAccountCharge, updatePosAlertContact, updatePosConfig, voidPosSale } from '../services/posService';
 import { useAuthStore } from '../stores/authStore';
 
 export default function PosPage() {
@@ -84,6 +84,12 @@ export default function PosPage() {
     buckets: [],
     top_overdue_members: []
   });
+  const [collectionsKpiToday, setCollectionsKpiToday] = useState({
+    contacted_today_count: 0,
+    contacted_today_unique_members: 0,
+    recovered_today_count: 0,
+    recovered_today_amount: 0
+  });
   const [summary, setSummary] = useState({
     today_sales_count: 0,
     today_sales_total: 0,
@@ -93,7 +99,7 @@ export default function PosPage() {
 
   const load = async () => {
     try {
-      const [salesData, chargesData, productsData, movementsData, openCashData, cashSessionsData, posConfig, summaryData, lowStockData, cashByOperatorData, auditData, alertsData, contactsData, dispatchHistoryData, alertsStatusData, alertsCronHistoryData, autosettleKpiData, memberAccountAgingData] = await Promise.all([
+      const [salesData, chargesData, productsData, movementsData, openCashData, cashSessionsData, posConfig, summaryData, lowStockData, cashByOperatorData, auditData, alertsData, contactsData, dispatchHistoryData, alertsStatusData, alertsCronHistoryData, autosettleKpiData, memberAccountAgingData, collectionsKpiData] = await Promise.all([
         listPosSales({ page: 1, per_page: 20 }),
         listMemberAccountCharges({ status: 'pending_auto_debit', page: 1, per_page: 20 }),
         listPosProducts(),
@@ -131,7 +137,8 @@ export default function PosPage() {
           date_from: autosettleDateFrom || undefined,
           date_to: autosettleDateTo || undefined
         }),
-        getMemberAccountAging()
+        getMemberAccountAging(),
+        getMemberAccountCollectionsKpiToday()
       ]);
       setSales(Array.isArray(salesData?.items) ? salesData.items : []);
       setCharges(Array.isArray(chargesData?.items) ? chargesData.items : []);
@@ -173,6 +180,12 @@ export default function PosPage() {
         overdue_total_amount: Number(memberAccountAgingData?.overdue_total_amount ?? 0),
         buckets: Array.isArray(memberAccountAgingData?.buckets) ? memberAccountAgingData.buckets : [],
         top_overdue_members: Array.isArray(memberAccountAgingData?.top_overdue_members) ? memberAccountAgingData.top_overdue_members : []
+      });
+      setCollectionsKpiToday({
+        contacted_today_count: Number(collectionsKpiData?.contacted_today_count ?? 0),
+        contacted_today_unique_members: Number(collectionsKpiData?.contacted_today_unique_members ?? 0),
+        recovered_today_count: Number(collectionsKpiData?.recovered_today_count ?? 0),
+        recovered_today_amount: Number(collectionsKpiData?.recovered_today_amount ?? 0)
       });
     } catch {
       // no-op
@@ -738,6 +751,24 @@ ${sale.notes ? `Nota: ${sale.notes}` : ''}
 
       <div className="rounded-xl bg-white p-4 shadow-sm">
         <h3 className="mb-2 text-lg font-semibold text-slate-900">Morosidad cuenta socio</h3>
+        <div className="mb-3 grid gap-2 md:grid-cols-4">
+          <div className="rounded border border-slate-200 p-2">
+            <p className="text-xs uppercase tracking-wide text-slate-500">Contactos hoy</p>
+            <p className="text-lg font-semibold text-slate-900">{collectionsKpiToday.contacted_today_count}</p>
+          </div>
+          <div className="rounded border border-slate-200 p-2">
+            <p className="text-xs uppercase tracking-wide text-slate-500">Socios contactados</p>
+            <p className="text-lg font-semibold text-slate-900">{collectionsKpiToday.contacted_today_unique_members}</p>
+          </div>
+          <div className="rounded border border-slate-200 p-2">
+            <p className="text-xs uppercase tracking-wide text-slate-500">Cargos recuperados</p>
+            <p className="text-lg font-semibold text-emerald-700">{collectionsKpiToday.recovered_today_count}</p>
+          </div>
+          <div className="rounded border border-slate-200 p-2">
+            <p className="text-xs uppercase tracking-wide text-slate-500">Recuperado hoy</p>
+            <p className="text-lg font-semibold text-emerald-700">${collectionsKpiToday.recovered_today_amount.toFixed(2)}</p>
+          </div>
+        </div>
         <p className="mb-3 text-sm text-slate-600">
           Vencido total: <strong>{memberAccountAging.overdue_total_count}</strong> cargos · <strong>${memberAccountAging.overdue_total_amount.toFixed(2)}</strong>
         </p>

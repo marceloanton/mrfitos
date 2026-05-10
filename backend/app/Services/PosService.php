@@ -185,7 +185,7 @@ final class PosService
         ];
     }
 
-    public function buildMemberOverdueWhatsAppLink(int $tenantId, int $gymId, int $memberId): array
+    public function buildMemberOverdueWhatsAppLink(int $tenantId, int $gymId, int $memberId, ?int $actorUserId = null): array
     {
         if ($memberId <= 0) {
             throw new \InvalidArgumentException('member_id is required');
@@ -217,7 +217,7 @@ final class PosService
             $maxDaysOverdue
         );
 
-        return [
+        $result = [
             'member_id' => (int) ($row['member_id'] ?? 0),
             'member_code' => (string) ($row['member_code'] ?? ''),
             'member_name' => $memberName,
@@ -227,6 +227,37 @@ final class PosService
             'max_days_overdue' => $maxDaysOverdue,
             'message_text' => $text,
             'whatsapp_link' => 'https://wa.me/' . $phoneNormalized . '?text=' . rawurlencode($text),
+        ];
+        $this->activity->create([
+            'tenant_id' => $tenantId,
+            'gym_id' => $gymId,
+            'user_id' => $actorUserId && $actorUserId > 0 ? $actorUserId : null,
+            'entity_type' => 'member',
+            'entity_id' => $memberId,
+            'action' => 'pos_member_account_overdue_whatsapp_opened',
+            'metadata' => [
+                'member_id' => $result['member_id'],
+                'member_code' => $result['member_code'],
+                'phone_normalized' => $result['phone_normalized'],
+                'overdue_total_amount' => $result['overdue_total_amount'],
+                'overdue_charges_count' => $result['overdue_charges_count'],
+                'max_days_overdue' => $result['max_days_overdue'],
+            ],
+            'ip_address' => $_SERVER['REMOTE_ADDR'] ?? null,
+            'user_agent' => $_SERVER['HTTP_USER_AGENT'] ?? null,
+        ]);
+        return $result;
+    }
+
+    public function getMemberAccountCollectionsKpiToday(int $tenantId, int $gymId): array
+    {
+        $row = $this->repo->getMemberAccountCollectionsKpiToday($tenantId, $gymId);
+        return [
+            'date' => date('Y-m-d'),
+            'contacted_today_count' => (int) ($row['contacted_today_count'] ?? 0),
+            'contacted_today_unique_members' => (int) ($row['contacted_today_unique_members'] ?? 0),
+            'recovered_today_count' => (int) ($row['recovered_today_count'] ?? 0),
+            'recovered_today_amount' => (float) ($row['recovered_today_amount'] ?? 0),
         ];
     }
 
