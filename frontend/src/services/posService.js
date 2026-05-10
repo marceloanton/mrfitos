@@ -99,3 +99,11 @@ export async function getPosZCloseReport(params = {}) {
   const { data } = await api.get('/pos/reports/z-close', { params });
   return payload(data);
 }
+
+export async function exportPosZCloseCsv(params = {}) {
+  const { data } = await api.get('/pos/reports/z-close/export', {
+    params,
+    responseType: 'blob'
+  });
+  return data;
+}

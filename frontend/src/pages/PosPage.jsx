@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { adjustStock, closeCashSession, createPosProduct, createPosSale, getCashSessionReport, getOpenCashSessionSummary, getPosConfig, getPosSaleReceipt, getPosSaleReceiptByNumber, getPosSummary, getPosZCloseReport, listCashSessions, listMemberAccountCharges, listPosProducts, listPosSales, listStockMovements, openCashSession, settleMemberAccountCharge, updatePosConfig } from '../services/posService';
+import { adjustStock, closeCashSession, createPosProduct, createPosSale, exportPosZCloseCsv, getCashSessionReport, getOpenCashSessionSummary, getPosConfig, getPosSaleReceipt, getPosSaleReceiptByNumber, getPosSummary, getPosZCloseReport, listCashSessions, listMemberAccountCharges, listPosProducts, listPosSales, listStockMovements, openCashSession, settleMemberAccountCharge, updatePosConfig } from '../services/posService';
 
 export default function PosPage() {
   const [requireOpenCash, setRequireOpenCash] = useState(true);
@@ -331,6 +331,23 @@ ${sale.notes ? `Nota: ${sale.notes}` : ''}
     }
   };
 
+  const onExportZCloseCsv = async () => {
+    setError('');
+    try {
+      const blob = await exportPosZCloseCsv({ date: zCloseDate });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `z-close-${zCloseDate}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(err?.response?.data?.message ?? 'No se pudo exportar CSV de cierre Z.');
+    }
+  };
+
   useEffect(() => {
     load();
   }, []);
@@ -501,6 +518,9 @@ ${sale.notes ? `Nota: ${sale.notes}` : ''}
           />
           <button className="rounded border border-slate-300 px-2 py-1 text-sm" onClick={onPrintZClose}>
             Imprimir Cierre Z
+          </button>
+          <button className="rounded border border-slate-300 px-2 py-1 text-sm" onClick={onExportZCloseCsv}>
+            Exportar CSV Z
           </button>
         </div>
         <div className="mb-3 flex items-center gap-3 rounded border border-slate-200 p-2 text-sm">

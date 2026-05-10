@@ -252,6 +252,22 @@ final class PosController
         }
     }
 
+    public function zCloseReportExport(): void
+    {
+        $auth = json_decode($_SERVER['auth_user'] ?? '{}', true) ?: [];
+        $date = Request::query('date', null);
+        try {
+            $tenantId = (int) ($auth['tenant_id'] ?? 0);
+            $gymId = (int) ($auth['gym_id'] ?? 0);
+            $data = $this->service->getDailyZCloseReport($tenantId, $gymId, $date);
+            $this->emitZCloseCsv($tenantId, $gymId, $data);
+        } catch (\InvalidArgumentException $e) {
+            Response::json(['success' => false, 'message' => $e->getMessage()], 422);
+        } catch (\Throwable $e) {
+            Response::json(['success' => false, 'message' => 'Failed to export POS daily Z close report'], 500);
+        }
+    }
+
     public function config(): void
     {
         $auth = json_decode($_SERVER['auth_user'] ?? '{}', true) ?: [];
@@ -270,5 +286,89 @@ final class PosController
         } catch (\Throwable $e) {
             Response::json(['success' => false, 'message' => 'Failed to update POS config'], 500);
         }
+    }
+
+    private function emitZCloseCsv(int $tenantId, int $gymId, array $report): never
+    {
+        $reportDate = (string) ($report['date'] ?? date('Y-m-d'));
+        $filename = 'z-close-' . $reportDate . '.csv';
+
+        http_response_code(200);
+        header('Content-Type: text/csv; charset=utf-8');
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
+        header('Cache-Control: no-store, no-cache, must-revalidate');
+
+        $out = fopen('php://output', 'wb');
+        if ($out === false) {
+            Response::json(['success' => false, 'message' => 'Unable to create CSV output'], 500);
+        }
+
+        fputcsv($out, ['section', 'metric', 'value']);
+
+        fputcsv($out, ['metadata', 'tenant_id', (string) $tenantId]);
+        fputcsv($out, ['metadata', 'gym_id', (string) $gymId]);
+        fputcsv($out, ['metadata', 'date', $reportDate]);
+        fputcsv($out, ['', '', '']);
+
+        $cashSessions = is_array($report['cash_sessions'] ?? null) ? $report['cash_sessions'] : [];
+        $this->writeSectionRows($out, 'cash_sessions', [
+            'opened_count' => $cashSessions['opened_count'] ?? 0,
+            'closed_count' => $cashSessions['closed_count'] ?? 0,
+            'opening_total' => $cashSessions['opening_total'] ?? 0,
+            'expected_total' => $cashSessions['expected_total'] ?? 0,
+            'closing_total' => $cashSessions['closing_total'] ?? 0,
+            'difference_total' => $cashSessions['difference_total'] ?? 0,
+        ]);
+
+        $payments = is_array($report['payments'] ?? null) ? $report['payments'] : [];
+        $paymentsByMethod = is_array($payments['by_method'] ?? null) ? $payments['by_method'] : [];
+        $this->writeSectionRows($out, 'payments_by_method', [
+            'cash' => $paymentsByMethod['cash'] ?? 0,
+            'transfer' => $paymentsByMethod['transfer'] ?? 0,
+            'mercadopago' => $paymentsByMethod['mercadopago'] ?? 0,
+            'card' => $paymentsByMethod['card'] ?? 0,
+            'other' => $paymentsByMethod['other'] ?? 0,
+            'total' => $payments['total'] ?? 0,
+        ]);
+
+        $posSales = is_array($report['pos_sales'] ?? null) ? $report['pos_sales'] : [];
+        $this->writeSectionRows($out, 'pos_sales', [
+            'count' => $posSales['count'] ?? 0,
+            'total' => $posSales['total'] ?? 0,
+        ]);
+
+        $settlements = is_array($report['member_account_settlements'] ?? null) ? $report['member_account_settlements'] : [];
+        $this->writeSectionRows($out, 'member_account_settlements', [
+            'count' => $settlements['count'] ?? 0,
+            'total' => $settlements['total'] ?? 0,
+        ]);
+
+        fclose($out);
+        exit;
+    }
+
+    /**
+     * @param resource $out
+     */
+    private function writeSectionRows($out, string $section, array $rows): void
+    {
+        foreach ($rows as $metric => $value) {
+            fputcsv($out, [$section, (string) $metric, $this->normalizeCsvValue($value)]);
+        }
+        fputcsv($out, ['', '', '']);
+    }
+
+    private function normalizeCsvValue(mixed $value): string
+    {
+        if ($value === null) {
+            return '';
+        }
+        if (is_bool($value)) {
+            return $value ? '1' : '0';
+        }
+        if (!is_scalar($value)) {
+            return (string) json_encode($value, JSON_UNESCAPED_UNICODE);
+        }
+        return (string) $value;
     }
 }
