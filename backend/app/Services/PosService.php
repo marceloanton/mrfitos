@@ -1229,6 +1229,28 @@ final class PosService
         ];
     }
 
+    public function listCriticalAlertDispatchHistory(
+        int $tenantId,
+        int $gymId,
+        mixed $dateFromInput,
+        mixed $dateToInput,
+        int $page,
+        int $perPage
+    ): array {
+        $filters = $this->resolveDispatchHistoryFilters($dateFromInput, $dateToInput);
+        $rows = $this->repo->listCriticalAlertDispatchHistory(
+            $tenantId,
+            $gymId,
+            $filters['date_from'],
+            $filters['date_to'],
+            $page,
+            $perPage
+        );
+
+        $rows['items'] = array_map([$this, 'normalizeDispatchHistoryItem'], $rows['items'] ?? []);
+        return $rows;
+    }
+
     private function getRequireOpenCash(int $tenantId, int $gymId): bool
     {
         $stored = $this->repo->getSetting($tenantId, $gymId, self::SETTING_REQUIRE_OPEN_CASH);
@@ -1443,6 +1465,46 @@ final class PosService
             'is_active' => (int) ($row['is_active'] ?? 0) === 1,
             'created_at' => (string) ($row['created_at'] ?? ''),
             'updated_at' => (string) ($row['updated_at'] ?? ''),
+        ];
+    }
+
+    private function resolveDispatchHistoryFilters(mixed $dateFromInput, mixed $dateToInput): array
+    {
+        $dateFrom = $this->resolveOptionalDate($dateFromInput, 'date_from');
+        $dateTo = $this->resolveOptionalDate($dateToInput, 'date_to');
+        if ($dateFrom !== null && $dateTo !== null && $dateFrom > $dateTo) {
+            throw new \InvalidArgumentException('date_from must be <= date_to');
+        }
+
+        return [
+            'date_from' => $dateFrom,
+            'date_to' => $dateTo,
+        ];
+    }
+
+    private function normalizeDispatchHistoryItem(array $row): array
+    {
+        $metadata = [];
+        $raw = $row['metadata'] ?? null;
+        if (is_string($raw) && $raw !== '') {
+            $decoded = json_decode($raw, true);
+            if (is_array($decoded)) {
+                $metadata = $decoded;
+            }
+        }
+
+        return [
+            'id' => (int) ($row['id'] ?? 0),
+            'created_at' => (string) ($row['created_at'] ?? ''),
+            'user_id' => isset($row['user_id']) ? (int) $row['user_id'] : null,
+            'entity_type' => (string) ($row['entity_type'] ?? ''),
+            'entity_id' => isset($row['entity_id']) ? (int) $row['entity_id'] : null,
+            'action' => (string) ($row['action'] ?? ''),
+            'level' => isset($metadata['level']) ? (string) $metadata['level'] : null,
+            'reason' => isset($metadata['reason']) ? (string) $metadata['reason'] : null,
+            'target_source' => isset($metadata['target_source']) ? (string) $metadata['target_source'] : null,
+            'target_label' => isset($metadata['target_label']) ? (string) $metadata['target_label'] : null,
+            'whatsapp_link' => isset($metadata['whatsapp_link']) ? (string) $metadata['whatsapp_link'] : null,
         ];
     }
 

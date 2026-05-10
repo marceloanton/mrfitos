@@ -316,6 +316,63 @@ final class PosRepository
         return $stmt->fetchAll() ?: [];
     }
 
+    public function listCriticalAlertDispatchHistory(
+        int $tenantId,
+        int $gymId,
+        ?string $dateFrom,
+        ?string $dateTo,
+        int $page,
+        int $perPage
+    ): array {
+        $offset = ($page - 1) * $perPage;
+        $where = 'tenant_id = :tenant_id
+                  AND gym_id = :gym_id
+                  AND action = "pos_alert_critical_notified"';
+        $params = [
+            'tenant_id' => $tenantId,
+            'gym_id' => $gymId,
+        ];
+
+        if ($dateFrom !== null) {
+            $where .= ' AND created_at >= :date_from_dt';
+            $params['date_from_dt'] = $dateFrom . ' 00:00:00';
+        }
+        if ($dateTo !== null) {
+            $where .= ' AND created_at <= :date_to_dt';
+            $params['date_to_dt'] = $dateTo . ' 23:59:59';
+        }
+
+        $countStmt = Database::connection()->prepare(
+            "SELECT COUNT(*) FROM activity_logs WHERE {$where}"
+        );
+        $countStmt->execute($params);
+        $total = (int) $countStmt->fetchColumn();
+
+        $stmt = Database::connection()->prepare(
+            "SELECT id, created_at, user_id, entity_type, entity_id, action, metadata
+             FROM activity_logs
+             WHERE {$where}
+             ORDER BY id DESC
+             LIMIT :limit OFFSET :offset"
+        );
+        foreach ($params as $key => $value) {
+            $stmt->bindValue(':' . $key, $value);
+        }
+        $stmt->bindValue(':limit', $perPage, \PDO::PARAM_INT);
+        $stmt->bindValue(':offset', $offset, \PDO::PARAM_INT);
+        $stmt->execute();
+
+        return [
+            'items' => $stmt->fetchAll() ?: [],
+            'meta' => [
+                'page' => $page,
+                'per_page' => $perPage,
+                'total' => $total,
+                'total_pages' => (int) max(1, ceil($total / $perPage)),
+            ],
+        ];
+    }
+
     private function buildPosAuditWhere(): string
     {
         return 'al.tenant_id = :tenant_id

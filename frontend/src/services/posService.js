@@ -133,6 +133,11 @@ export async function notifyCriticalPosAlert(body = {}) {
   return payload(data);
 }
 
+export async function listPosAlertDispatchHistory(params = {}) {
+  const { data } = await api.get('/pos/alerts/dispatch-history', { params });
+  return payload(data);
+}
+
 export async function listPosAlertContacts() {
   const { data } = await api.get('/pos/alerts/contacts');
   return payload(data);

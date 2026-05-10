@@ -342,6 +342,31 @@ final class PosController
         }
     }
 
+    public function dispatchHistory(): void
+    {
+        $auth = json_decode($_SERVER['auth_user'] ?? '{}', true) ?: [];
+        $page = max(1, (int) Request::query('page', 1));
+        $perPage = min(100, max(1, (int) Request::query('per_page', 20)));
+        $dateFrom = Request::query('date_from', null);
+        $dateTo = Request::query('date_to', null);
+
+        try {
+            $data = $this->service->listCriticalAlertDispatchHistory(
+                (int) ($auth['tenant_id'] ?? 0),
+                (int) ($auth['gym_id'] ?? 0),
+                $dateFrom,
+                $dateTo,
+                $page,
+                $perPage
+            );
+            Response::json(['success' => true, 'data' => $data]);
+        } catch (\InvalidArgumentException $e) {
+            Response::json(['success' => false, 'message' => $e->getMessage()], 422);
+        } catch (\Throwable $e) {
+            Response::json(['success' => false, 'message' => 'Failed to fetch POS critical alert dispatch history'], 500);
+        }
+    }
+
     public function alertsNotifyLink(): void
     {
         $auth = json_decode($_SERVER['auth_user'] ?? '{}', true) ?: [];
