@@ -14,6 +14,14 @@ export async function getPosAutosettleKpi(params = {}) {
   return payload(data);
 }
 
+export async function exportPosAutosettleKpiCsv(params = {}) {
+  const { data } = await api.get('/pos/member-account/autosettle-kpi/export', {
+    params,
+    responseType: 'blob'
+  });
+  return data;
+}
+
 export async function listPosSales(params = {}) {
   const { data } = await api.get('/pos/sales', { params });
   return payload(data);

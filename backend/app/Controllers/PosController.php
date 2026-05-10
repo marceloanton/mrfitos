@@ -71,6 +71,30 @@ final class PosController
         }
     }
 
+    public function autosettleKpiExport(): void
+    {
+        $auth = json_decode($_SERVER['auth_user'] ?? '{}', true) ?: [];
+        $date = Request::query('date', null);
+        $dateFrom = Request::query('date_from', null);
+        $dateTo = Request::query('date_to', null);
+        try {
+            $tenantId = (int) ($auth['tenant_id'] ?? 0);
+            $gymId = (int) ($auth['gym_id'] ?? 0);
+            $data = $this->service->getMemberAccountAutosettleKpi(
+                $tenantId,
+                $gymId,
+                is_string($date) ? $date : null,
+                is_string($dateFrom) ? $dateFrom : null,
+                is_string($dateTo) ? $dateTo : null
+            );
+            $this->emitAutosettleKpiCsv($tenantId, $gymId, $data);
+        } catch (\InvalidArgumentException $e) {
+            Response::json(['success' => false, 'message' => $e->getMessage()], 422);
+        } catch (\Throwable $e) {
+            Response::json(['success' => false, 'message' => 'Failed to export POS autosettle KPI'], 500);
+        }
+    }
+
     public function createProduct(): void
     {
         $auth = json_decode($_SERVER['auth_user'] ?? '{}', true) ?: [];
@@ -1050,6 +1074,55 @@ final class PosController
                 $this->normalizeCsvValue($item['entity_type'] ?? null),
                 $this->normalizeCsvValue($item['entity_id'] ?? null),
                 $this->normalizeCsvValue($item['action'] ?? null),
+            ]);
+        }
+
+        fclose($out);
+        exit;
+    }
+
+    private function emitAutosettleKpiCsv(int $tenantId, int $gymId, array $kpi): never
+    {
+        $dateFrom = (string) ($kpi['date_from'] ?? date('Y-m-d'));
+        $dateTo = (string) ($kpi['date_to'] ?? $dateFrom);
+        $filename = 'pos-autosettle-kpi-' . $dateFrom . '-to-' . $dateTo . '.csv';
+
+        http_response_code(200);
+        header('Content-Type: text/csv; charset=utf-8');
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
+        header('Cache-Control: no-store, no-cache, must-revalidate');
+
+        $out = fopen('php://output', 'wb');
+        if ($out === false) {
+            Response::json(['success' => false, 'message' => 'Unable to create CSV output'], 500);
+        }
+
+        fputcsv($out, ['section', 'field', 'value']);
+        fputcsv($out, ['metadata', 'tenant_id', (string) $tenantId]);
+        fputcsv($out, ['metadata', 'gym_id', (string) $gymId]);
+        fputcsv($out, ['metadata', 'date_from', $dateFrom]);
+        fputcsv($out, ['metadata', 'date_to', $dateTo]);
+        fputcsv($out, ['', '', '']);
+
+        $this->writeSectionRows($out, 'totals', [
+            'runs_count' => $kpi['runs_count'] ?? 0,
+            'processed_total' => $kpi['processed_total'] ?? 0,
+            'settled_total' => $kpi['settled_total'] ?? 0,
+            'failed_total' => $kpi['failed_total'] ?? 0,
+            'settled_amount_total' => $kpi['settled_amount_total'] ?? 0,
+        ]);
+
+        fputcsv($out, ['daily', 'date', 'runs_count', 'processed_total', 'settled_total', 'failed_total', 'settled_amount_total']);
+        $daily = is_array($kpi['daily'] ?? null) ? $kpi['daily'] : [];
+        foreach ($daily as $row) {
+            fputcsv($out, [
+                'daily',
+                $this->normalizeCsvValue($row['date'] ?? null),
+                $this->normalizeCsvValue($row['runs_count'] ?? null),
+                $this->normalizeCsvValue($row['processed_total'] ?? null),
+                $this->normalizeCsvValue($row['settled_total'] ?? null),
+                $this->normalizeCsvValue($row['failed_total'] ?? null),
+                $this->normalizeCsvValue($row['settled_amount_total'] ?? null),
             ]);
         }
 

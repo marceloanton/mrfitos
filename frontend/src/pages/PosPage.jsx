@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { adjustStock, autoSettleMemberAccountCharges, closeCashSession, createPosAlertContact, createPosProduct, createPosSale, deletePosAlertContact, exportPosAlertDispatchHistoryCsv, exportPosAuditCsv, exportPosZCloseCsv, getCashByOperatorReport, getCashSessionReport, getOpenCashSessionSummary, getPosAlertNotifyLink, getPosAlerts, getPosAlertsStatus, getPosAutosettleKpi, getPosConfig, getPosSaleReceipt, getPosSaleReceiptByNumber, getPosSummary, getPosZCloseReport, listCashSessions, listLowStockProducts, listMemberAccountCharges, listPosAlertContacts, listPosAlertDispatchHistory, listPosAlertsCronHistory, listPosAudit, listPosProducts, listPosSales, listStockMovements, notifyCriticalPosAlert, openCashSession, settleMemberAccountCharge, updatePosAlertContact, updatePosConfig, voidPosSale } from '../services/posService';
+import { adjustStock, autoSettleMemberAccountCharges, closeCashSession, createPosAlertContact, createPosProduct, createPosSale, deletePosAlertContact, exportPosAlertDispatchHistoryCsv, exportPosAuditCsv, exportPosAutosettleKpiCsv, exportPosZCloseCsv, getCashByOperatorReport, getCashSessionReport, getOpenCashSessionSummary, getPosAlertNotifyLink, getPosAlerts, getPosAlertsStatus, getPosAutosettleKpi, getPosConfig, getPosSaleReceipt, getPosSaleReceiptByNumber, getPosSummary, getPosZCloseReport, listCashSessions, listLowStockProducts, listMemberAccountCharges, listPosAlertContacts, listPosAlertDispatchHistory, listPosAlertsCronHistory, listPosAudit, listPosProducts, listPosSales, listStockMovements, notifyCriticalPosAlert, openCashSession, settleMemberAccountCharge, updatePosAlertContact, updatePosConfig, voidPosSale } from '../services/posService';
 import { useAuthStore } from '../stores/authStore';
 
 export default function PosPage() {
@@ -577,6 +577,24 @@ ${sale.notes ? `Nota: ${sale.notes}` : ''}
     }
   };
 
+  const onExportAutosettleKpiCsv = async () => {
+    setError('');
+    try {
+      const blob = await exportPosAutosettleKpiCsv({
+        date_from: autosettleDateFrom || undefined,
+        date_to: autosettleDateTo || undefined
+      });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `pos-autosettle-kpi-${autosettleDateFrom || 'from'}-to-${autosettleDateTo || 'to'}.csv`;
+      a.click();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(err?.response?.data?.message ?? 'No se pudo exportar KPI de auto-débito.');
+    }
+  };
+
   useEffect(() => {
     load();
   }, []);
@@ -738,6 +756,9 @@ ${sale.notes ? `Nota: ${sale.notes}` : ''}
           <input className="rounded border border-slate-300 p-2 text-sm" type="date" value={autosettleDateTo} onChange={(e) => setAutosettleDateTo(e.target.value)} />
           <button className="rounded border border-slate-300 px-3 py-2 text-sm" onClick={load}>
             Actualizar Auto-débito
+          </button>
+          <button className="rounded border border-slate-300 px-3 py-2 text-sm disabled:opacity-50" disabled={!canReportExport} onClick={onExportAutosettleKpiCsv}>
+            Exportar CSV
           </button>
         </div>
         <div className="grid grid-cols-7 gap-2">
