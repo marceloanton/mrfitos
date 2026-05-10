@@ -755,6 +755,62 @@ final class PosService
         ];
     }
 
+    public function getOperationalAlertsNotifyLink(
+        int $tenantId,
+        int $gymId,
+        mixed $dateFromInput,
+        mixed $dateToInput,
+        mixed $differenceThresholdInput,
+        mixed $voidsThresholdInput,
+        mixed $phoneInput
+    ): array {
+        $alerts = $this->getOperationalAlerts(
+            $tenantId,
+            $gymId,
+            $dateFromInput,
+            $dateToInput,
+            $differenceThresholdInput,
+            $voidsThresholdInput
+        );
+
+        $summary = is_array($alerts['summary'] ?? null) ? $alerts['summary'] : [];
+        $level = (string) ($summary['level'] ?? 'ok');
+        $baseMessage = (string) ($summary['message'] ?? 'Sin alertas operativas críticas');
+        $cashCount = (int) ($summary['high_cash_differences_count'] ?? 0);
+        $voidOpsCount = (int) ($summary['unusual_void_operators_count'] ?? 0);
+
+        $rawPhone = trim((string) ($phoneInput ?? ''));
+        if ($rawPhone === '') {
+            $gymPhone = $this->repo->findGymPhone($tenantId, $gymId);
+            $rawPhone = trim((string) ($gymPhone ?? ''));
+        }
+
+        $normalizedPhone = $this->normalizePhoneDigits($rawPhone);
+        if ($normalizedPhone === null) {
+            return [
+                'level' => $level,
+                'message' => $baseMessage . '. No hay teléfono válido configurado para WhatsApp.',
+                'phone_normalized' => null,
+                'whatsapp_link' => null,
+            ];
+        }
+
+        $text = sprintf(
+            '[MRFitOS] Alerta POS %s. %s. Diferencias de caja: %d. Operadores con anulaciones inusuales: %d.',
+            strtoupper($level),
+            $baseMessage,
+            $cashCount,
+            $voidOpsCount
+        );
+
+        return [
+            'level' => $level,
+            'message' => $baseMessage,
+            'phone_normalized' => $normalizedPhone,
+            'whatsapp_link' => 'https://wa.me/' . $normalizedPhone . '?text=' . rawurlencode($text),
+        ];
+    }
+
     public function getCashSessionReport(int $tenantId, int $gymId, int $cashSessionId): array
     {
         if ($cashSessionId <= 0) {
@@ -1142,5 +1198,22 @@ final class PosService
             'user_agent' => $row['user_agent'] ?? null,
             'created_at' => (string) ($row['created_at'] ?? ''),
         ];
+    }
+
+    private function normalizePhoneDigits(string $phone): ?string
+    {
+        $digits = preg_replace('/\D+/', '', $phone);
+        if (!is_string($digits)) {
+            return null;
+        }
+        $digits = trim($digits);
+        if ($digits === '') {
+            return null;
+        }
+        $len = strlen($digits);
+        if ($len < 8 || $len > 15) {
+            return null;
+        }
+        return $digits;
     }
 }

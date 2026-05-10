@@ -135,6 +135,7 @@ $router->add('GET', '/pos/reports/z-close', [PosController::class, 'zCloseReport
 $router->add('GET', '/pos/reports/z-close/export', [PosController::class, 'zCloseReportExport'], [AuthMiddleware::class, TenantMiddleware::class, new PermissionMiddleware('pos.report.export')]);
 $router->add('GET', '/pos/reports/cash-by-operator', [PosController::class, 'cashByOperatorReport'], [AuthMiddleware::class, TenantMiddleware::class, new PermissionMiddleware('pos.report.read')]);
 $router->add('GET', '/pos/alerts', [PosController::class, 'alerts'], [AuthMiddleware::class, TenantMiddleware::class, new PermissionMiddleware('pos.report.read')]);
+$router->add('GET', '/pos/alerts/notify-link', [PosController::class, 'alertsNotifyLink'], [AuthMiddleware::class, TenantMiddleware::class, new PermissionMiddleware('pos.report.read'), new PermissionMiddleware('whatsapp.send')]);
 $router->add('GET', '/pos/audit', [PosController::class, 'audit'], [AuthMiddleware::class, TenantMiddleware::class, new PermissionMiddleware('pos.report.read')]);
 $router->add('GET', '/pos/audit/export', [PosController::class, 'auditExport'], [AuthMiddleware::class, TenantMiddleware::class, new PermissionMiddleware('pos.report.export')]);
 

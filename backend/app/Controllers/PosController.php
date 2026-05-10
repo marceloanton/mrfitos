@@ -342,6 +342,32 @@ final class PosController
         }
     }
 
+    public function alertsNotifyLink(): void
+    {
+        $auth = json_decode($_SERVER['auth_user'] ?? '{}', true) ?: [];
+        $dateFrom = Request::query('date_from', null);
+        $dateTo = Request::query('date_to', null);
+        $differenceThreshold = Request::query('difference_threshold', null);
+        $voidsThreshold = Request::query('voids_threshold', null);
+        $phone = Request::query('phone', null);
+        try {
+            $data = $this->service->getOperationalAlertsNotifyLink(
+                (int) ($auth['tenant_id'] ?? 0),
+                (int) ($auth['gym_id'] ?? 0),
+                $dateFrom,
+                $dateTo,
+                $differenceThreshold,
+                $voidsThreshold,
+                $phone
+            );
+            Response::json(['success' => true, 'data' => $data]);
+        } catch (\InvalidArgumentException $e) {
+            Response::json(['success' => false, 'message' => $e->getMessage()], 422);
+        } catch (\Throwable $e) {
+            Response::json(['success' => false, 'message' => 'Failed to build POS alert WhatsApp link'], 500);
+        }
+    }
+
     public function zCloseReportExport(): void
     {
         $auth = json_decode($_SERVER['auth_user'] ?? '{}', true) ?: [];

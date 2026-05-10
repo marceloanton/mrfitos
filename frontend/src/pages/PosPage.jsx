@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { adjustStock, closeCashSession, createPosProduct, createPosSale, exportPosAuditCsv, exportPosZCloseCsv, getCashByOperatorReport, getCashSessionReport, getOpenCashSessionSummary, getPosAlerts, getPosConfig, getPosSaleReceipt, getPosSaleReceiptByNumber, getPosSummary, getPosZCloseReport, listCashSessions, listLowStockProducts, listMemberAccountCharges, listPosAudit, listPosProducts, listPosSales, listStockMovements, openCashSession, settleMemberAccountCharge, updatePosConfig, voidPosSale } from '../services/posService';
+import { adjustStock, closeCashSession, createPosProduct, createPosSale, exportPosAuditCsv, exportPosZCloseCsv, getCashByOperatorReport, getCashSessionReport, getOpenCashSessionSummary, getPosAlertNotifyLink, getPosAlerts, getPosConfig, getPosSaleReceipt, getPosSaleReceiptByNumber, getPosSummary, getPosZCloseReport, listCashSessions, listLowStockProducts, listMemberAccountCharges, listPosAudit, listPosProducts, listPosSales, listStockMovements, openCashSession, settleMemberAccountCharge, updatePosConfig, voidPosSale } from '../services/posService';
 import { useAuthStore } from '../stores/authStore';
 
 export default function PosPage() {
@@ -54,6 +54,7 @@ export default function PosPage() {
     voids_threshold: '3'
   });
   const [posAlerts, setPosAlerts] = useState({ summary: null, high_cash_differences: [], unusual_voids_by_operator: [] });
+  const [alertNotifyInfo, setAlertNotifyInfo] = useState(null);
   const [summary, setSummary] = useState({
     today_sales_count: 0,
     today_sales_total: 0,
@@ -431,6 +432,24 @@ ${sale.notes ? `Nota: ${sale.notes}` : ''}
       window.URL.revokeObjectURL(url);
     } catch (err) {
       setError(err?.response?.data?.message ?? 'No se pudo exportar auditoría POS.');
+    }
+  };
+
+  const onNotifyAlertsWhatsapp = async () => {
+    setError('');
+    try {
+      const data = await getPosAlertNotifyLink({
+        date_from: alertFilters.date_from || undefined,
+        date_to: alertFilters.date_to || undefined,
+        difference_threshold: Number(alertFilters.difference_threshold || 0),
+        voids_threshold: Number(alertFilters.voids_threshold || 3)
+      });
+      setAlertNotifyInfo(data);
+      if (data?.whatsapp_link) {
+        window.open(data.whatsapp_link, '_blank', 'noopener,noreferrer');
+      }
+    } catch (err) {
+      setError(err?.response?.data?.message ?? 'No se pudo generar notificación WhatsApp.');
     }
   };
 
@@ -865,10 +884,20 @@ ${sale.notes ? `Nota: ${sale.notes}` : ''}
       <div className="rounded-xl bg-white p-4 shadow-sm">
         <div className="mb-2 flex items-center justify-between gap-2">
           <h3 className="text-lg font-semibold text-slate-900">Alertas de Riesgo POS</h3>
-          <button className="rounded border border-slate-300 px-2 py-1 text-sm disabled:opacity-50" disabled={!canReportRead} onClick={load}>
-            Actualizar alertas
-          </button>
+          <div className="flex gap-2">
+            <button className="rounded border border-slate-300 px-2 py-1 text-sm disabled:opacity-50" disabled={!canReportRead} onClick={load}>
+              Actualizar alertas
+            </button>
+            <button className="rounded border border-slate-300 px-2 py-1 text-sm disabled:opacity-50" disabled={!canReportRead} onClick={onNotifyAlertsWhatsapp}>
+              Notificar WhatsApp
+            </button>
+          </div>
         </div>
+        {alertNotifyInfo && !alertNotifyInfo.whatsapp_link && (
+          <p className="mb-2 rounded border border-slate-300 bg-slate-50 p-2 text-xs text-slate-700">
+            {alertNotifyInfo.message}
+          </p>
+        )}
         {posAlerts?.summary && (
           <div
             className={

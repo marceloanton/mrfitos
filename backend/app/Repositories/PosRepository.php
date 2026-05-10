@@ -6,6 +6,28 @@ use Core\Database;
 
 final class PosRepository
 {
+    public function findGymPhone(int $tenantId, int $gymId): ?string
+    {
+        $stmt = Database::connection()->prepare(
+            'SELECT phone
+             FROM gyms
+             WHERE id = :gym_id
+               AND tenant_id = :tenant_id
+               AND deleted_at IS NULL
+             LIMIT 1'
+        );
+        $stmt->execute([
+            'gym_id' => $gymId,
+            'tenant_id' => $tenantId,
+        ]);
+        $phone = $stmt->fetchColumn();
+        if (!is_string($phone)) {
+            return null;
+        }
+        $phone = trim($phone);
+        return $phone !== '' ? $phone : null;
+    }
+
     public function getHighCashDifferences(
         int $tenantId,
         int $gymId,

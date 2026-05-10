@@ -123,6 +123,11 @@ export async function getPosAlerts(params = {}) {
   return payload(data);
 }
 
+export async function getPosAlertNotifyLink(params = {}) {
+  const { data } = await api.get('/pos/alerts/notify-link', { params });
+  return payload(data);
+}
+
 export async function getCashSessionReport(id) {
   const { data } = await api.get(`/pos/cash-sessions/${id}/report`);
   return payload(data);
