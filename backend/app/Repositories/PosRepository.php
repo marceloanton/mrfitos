@@ -1944,4 +1944,25 @@ final class PosRepository
         $stmt->execute();
         return $stmt->fetchAll() ?: [];
     }
+
+    public function markOverduePromisesAsContacted(int $tenantId, int $gymId, ?int $updatedByUserId): int
+    {
+        $stmt = Database::connection()->prepare(
+            'UPDATE member_account_followups
+             SET status = "contacted",
+                 updated_by_user_id = :updated_by_user_id,
+                 updated_at = NOW()
+             WHERE tenant_id = :tenant_id
+               AND gym_id = :gym_id
+               AND status = "promise"
+               AND promise_date IS NOT NULL
+               AND promise_date < CURDATE()'
+        );
+        $stmt->execute([
+            'updated_by_user_id' => $updatedByUserId,
+            'tenant_id' => $tenantId,
+            'gym_id' => $gymId,
+        ]);
+        return $stmt->rowCount();
+    }
 }

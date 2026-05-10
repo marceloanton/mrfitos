@@ -315,6 +315,26 @@ final class PosService
         ];
     }
 
+    public function markOverduePromisesAsContacted(int $tenantId, int $gymId, int $userId): array
+    {
+        $updated = $this->repo->markOverduePromisesAsContacted($tenantId, $gymId, $userId > 0 ? $userId : null);
+        $this->activity->create([
+            'tenant_id' => $tenantId,
+            'gym_id' => $gymId,
+            'user_id' => $userId > 0 ? $userId : null,
+            'entity_type' => 'member',
+            'entity_id' => null,
+            'action' => 'pos_member_account_followup_bulk_contacted',
+            'metadata' => [
+                'updated_count' => $updated,
+                'scope' => 'overdue_promises',
+            ],
+            'ip_address' => $_SERVER['REMOTE_ADDR'] ?? null,
+            'user_agent' => $_SERVER['HTTP_USER_AGENT'] ?? null,
+        ]);
+        return ['updated_count' => $updated];
+    }
+
     public function buildMemberOverdueWhatsAppLink(int $tenantId, int $gymId, int $memberId, ?int $actorUserId = null): array
     {
         if ($memberId <= 0) {

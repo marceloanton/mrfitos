@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { adjustStock, autoSettleMemberAccountCharges, closeCashSession, createPosAlertContact, createPosProduct, createPosSale, deletePosAlertContact, exportMemberAccountPromiseAgendaCsv, exportPosAlertDispatchHistoryCsv, exportPosAuditCsv, exportPosAutosettleKpiCsv, exportPosZCloseCsv, getCashByOperatorReport, getCashSessionReport, getMemberAccountAging, getMemberAccountCollectionsKpiToday, getMemberAccountFollowupFunnel, getMemberAccountOverdueWhatsAppLink, getMemberAccountPromiseAgenda, getOpenCashSessionSummary, getPosAlertNotifyLink, getPosAlerts, getPosAlertsStatus, getPosAutosettleKpi, getPosConfig, getPosSaleReceipt, getPosSaleReceiptByNumber, getPosSummary, getPosZCloseReport, listCashSessions, listLowStockProducts, listMemberAccountCharges, listPosAlertContacts, listPosAlertDispatchHistory, listPosAlertsCronHistory, listPosAudit, listPosProducts, listPosSales, listStockMovements, notifyCriticalPosAlert, openCashSession, settleMemberAccountCharge, updatePosAlertContact, updatePosConfig, upsertMemberAccountFollowup, voidPosSale } from '../services/posService';
+import { adjustStock, autoSettleMemberAccountCharges, bulkMarkPromiseAgendaContacted, closeCashSession, createPosAlertContact, createPosProduct, createPosSale, deletePosAlertContact, exportMemberAccountPromiseAgendaCsv, exportPosAlertDispatchHistoryCsv, exportPosAuditCsv, exportPosAutosettleKpiCsv, exportPosZCloseCsv, getCashByOperatorReport, getCashSessionReport, getMemberAccountAging, getMemberAccountCollectionsKpiToday, getMemberAccountFollowupFunnel, getMemberAccountOverdueWhatsAppLink, getMemberAccountPromiseAgenda, getOpenCashSessionSummary, getPosAlertNotifyLink, getPosAlerts, getPosAlertsStatus, getPosAutosettleKpi, getPosConfig, getPosSaleReceipt, getPosSaleReceiptByNumber, getPosSummary, getPosZCloseReport, listCashSessions, listLowStockProducts, listMemberAccountCharges, listPosAlertContacts, listPosAlertDispatchHistory, listPosAlertsCronHistory, listPosAudit, listPosProducts, listPosSales, listStockMovements, notifyCriticalPosAlert, openCashSession, settleMemberAccountCharge, updatePosAlertContact, updatePosConfig, upsertMemberAccountFollowup, voidPosSale } from '../services/posService';
 import { useAuthStore } from '../stores/authStore';
 
 export default function PosPage() {
@@ -764,6 +764,18 @@ ${sale.notes ? `Nota: ${sale.notes}` : ''}
     }
   };
 
+  const onBulkMarkPromiseContacted = async () => {
+    if (!window.confirm('Marcar todas las promesas vencidas como contactadas?')) return;
+    setError('');
+    try {
+      const data = await bulkMarkPromiseAgendaContacted();
+      setMessage(`Promesas vencidas marcadas como contactadas: ${Number(data?.updated_count ?? 0)}.`);
+      await load();
+    } catch (err) {
+      setError(err?.response?.data?.message ?? 'No se pudo ejecutar acción masiva de promesas.');
+    }
+  };
+
   const onCreateProduct = async () => {
     setError('');
     setMessage('');
@@ -844,6 +856,9 @@ ${sale.notes ? `Nota: ${sale.notes}` : ''}
           </div>
         </div>
         <div className="mb-3 flex justify-end">
+          <button className="mr-2 rounded border border-amber-300 px-3 py-2 text-sm text-amber-700 disabled:opacity-50" disabled={!canSaleCreate} onClick={onBulkMarkPromiseContacted}>
+            Marcar vencidas como contactadas
+          </button>
           <button className="rounded border border-slate-300 px-3 py-2 text-sm disabled:opacity-50" disabled={!canReportExport} onClick={onExportPromiseAgendaCsv}>
             Exportar Agenda CSV
           </button>

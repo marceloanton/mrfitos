@@ -218,6 +218,23 @@ final class PosController
         }
     }
 
+    public function memberAccountPromiseAgendaBulkContacted(): void
+    {
+        $auth = json_decode($_SERVER['auth_user'] ?? '{}', true) ?: [];
+        try {
+            $data = $this->service->markOverduePromisesAsContacted(
+                (int) ($auth['tenant_id'] ?? 0),
+                (int) ($auth['gym_id'] ?? 0),
+                (int) ($auth['sub'] ?? 0)
+            );
+            Response::json(['success' => true, 'data' => $data]);
+        } catch (\InvalidArgumentException $e) {
+            Response::json(['success' => false, 'message' => $e->getMessage()], 422);
+        } catch (\Throwable $e) {
+            Response::json(['success' => false, 'message' => 'Failed to mark overdue promises as contacted'], 500);
+        }
+    }
+
     public function createProduct(): void
     {
         $auth = json_decode($_SERVER['auth_user'] ?? '{}', true) ?: [];
