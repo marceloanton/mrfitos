@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { adjustStock, closeCashSession, createPosAlertContact, createPosProduct, createPosSale, deletePosAlertContact, exportPosAlertDispatchHistoryCsv, exportPosAuditCsv, exportPosZCloseCsv, getCashByOperatorReport, getCashSessionReport, getOpenCashSessionSummary, getPosAlertNotifyLink, getPosAlerts, getPosConfig, getPosSaleReceipt, getPosSaleReceiptByNumber, getPosSummary, getPosZCloseReport, listCashSessions, listLowStockProducts, listMemberAccountCharges, listPosAlertContacts, listPosAlertDispatchHistory, listPosAudit, listPosProducts, listPosSales, listStockMovements, notifyCriticalPosAlert, openCashSession, settleMemberAccountCharge, updatePosAlertContact, updatePosConfig, voidPosSale } from '../services/posService';
+import { adjustStock, closeCashSession, createPosAlertContact, createPosProduct, createPosSale, deletePosAlertContact, exportPosAlertDispatchHistoryCsv, exportPosAuditCsv, exportPosZCloseCsv, getCashByOperatorReport, getCashSessionReport, getOpenCashSessionSummary, getPosAlertNotifyLink, getPosAlerts, getPosAlertsStatus, getPosConfig, getPosSaleReceipt, getPosSaleReceiptByNumber, getPosSummary, getPosZCloseReport, listCashSessions, listLowStockProducts, listMemberAccountCharges, listPosAlertContacts, listPosAlertDispatchHistory, listPosAudit, listPosProducts, listPosSales, listStockMovements, notifyCriticalPosAlert, openCashSession, settleMemberAccountCharge, updatePosAlertContact, updatePosConfig, voidPosSale } from '../services/posService';
 import { useAuthStore } from '../stores/authStore';
 
 export default function PosPage() {
@@ -60,6 +60,7 @@ export default function PosPage() {
   const [newAlertContact, setNewAlertContact] = useState({ label: '', phone: '' });
   const [dispatchHistoryFilters, setDispatchHistoryFilters] = useState({ date_from: '', date_to: '' });
   const [dispatchHistoryRows, setDispatchHistoryRows] = useState([]);
+  const [alertsStatus, setAlertsStatus] = useState(null);
   const [summary, setSummary] = useState({
     today_sales_count: 0,
     today_sales_total: 0,
@@ -69,7 +70,7 @@ export default function PosPage() {
 
   const load = async () => {
     try {
-      const [salesData, chargesData, productsData, movementsData, openCashData, cashSessionsData, posConfig, summaryData, lowStockData, cashByOperatorData, auditData, alertsData, contactsData, dispatchHistoryData] = await Promise.all([
+      const [salesData, chargesData, productsData, movementsData, openCashData, cashSessionsData, posConfig, summaryData, lowStockData, cashByOperatorData, auditData, alertsData, contactsData, dispatchHistoryData, alertsStatusData] = await Promise.all([
         listPosSales({ page: 1, per_page: 20 }),
         listMemberAccountCharges({ status: 'pending_auto_debit', page: 1, per_page: 20 }),
         listPosProducts(),
@@ -100,7 +101,8 @@ export default function PosPage() {
           per_page: 20,
           date_from: dispatchHistoryFilters.date_from || undefined,
           date_to: dispatchHistoryFilters.date_to || undefined
-        })
+        }),
+        getPosAlertsStatus()
       ]);
       setSales(Array.isArray(salesData?.items) ? salesData.items : []);
       setCharges(Array.isArray(chargesData?.items) ? chargesData.items : []);
@@ -128,6 +130,7 @@ export default function PosPage() {
       });
       setAlertContacts(Array.isArray(contactsData?.items) ? contactsData.items : []);
       setDispatchHistoryRows(Array.isArray(dispatchHistoryData?.items) ? dispatchHistoryData.items : []);
+      setAlertsStatus(alertsStatusData ?? null);
     } catch {
       // no-op
     }
@@ -1031,6 +1034,11 @@ ${sale.notes ? `Nota: ${sale.notes}` : ''}
             }
           >
             <strong>{String(posAlerts.summary.level || 'ok').toUpperCase()}</strong> · {posAlerts.summary.message}
+          </div>
+        )}
+        {alertsStatus && (
+          <div className="mb-3 rounded border border-slate-200 bg-slate-50 p-2 text-xs text-slate-700">
+            Último dispatch: {alertsStatus.last_dispatch_at ?? 'nunca'} · nivel: {alertsStatus.last_dispatch_level ?? '-'} · cooldown: {alertsStatus.cooldown_active ? `activo hasta ${alertsStatus.next_dispatch_allowed_at}` : 'inactivo'}
           </div>
         )}
         <div className="mb-3 grid gap-2 md:grid-cols-4">

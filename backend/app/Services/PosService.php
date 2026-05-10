@@ -884,7 +884,7 @@ final class PosService
             ];
         }
 
-        $lastDispatch = $this->repo->findLatestActivityByAction($tenantId, $gymId, 'pos_alert_critical_notified');
+        $lastDispatch = $this->repo->findLatestCriticalAlertDispatch($tenantId, $gymId);
         if ($lastDispatch) {
             $lastCreatedAt = (string) ($lastDispatch['created_at'] ?? '');
             $lastTs = strtotime($lastCreatedAt);
@@ -942,6 +942,52 @@ final class PosService
             'target_label' => $notifyData['target_label'] ?? null,
             'phone_normalized' => $notifyData['phone_normalized'] ?? null,
             'cooldown_minutes' => $cooldownMinutes,
+        ];
+    }
+
+    public function getOperationalAlertsStatus(int $tenantId, int $gymId, mixed $cooldownMinutesInput): array
+    {
+        $cooldownMinutes = $this->resolveCooldownMinutes($cooldownMinutesInput);
+        $lastDispatch = $this->repo->findLatestActivityByAction($tenantId, $gymId, 'pos_alert_critical_notified');
+
+        $lastDispatchAt = null;
+        $lastDispatchLevel = null;
+        $lastDispatchReason = null;
+        $nextDispatchAllowedAt = null;
+        $cooldownActive = false;
+
+        if ($lastDispatch) {
+            $lastDispatchAt = (string) ($lastDispatch['created_at'] ?? '');
+            $rawMetadata = $lastDispatch['metadata'] ?? null;
+            $metadata = [];
+            if (is_string($rawMetadata) && $rawMetadata !== '') {
+                $decoded = json_decode($rawMetadata, true);
+                if (is_array($decoded)) {
+                    $metadata = $decoded;
+                }
+            }
+
+            $level = trim((string) ($metadata['level'] ?? ''));
+            $reason = trim((string) ($metadata['reason'] ?? ''));
+            $lastDispatchLevel = $level !== '' ? $level : null;
+            $lastDispatchReason = $reason !== '' ? $reason : null;
+
+            if ($lastDispatchAt !== '') {
+                $lastTs = strtotime($lastDispatchAt);
+                if ($lastTs !== false) {
+                    $nextDispatchAllowedAt = date('Y-m-d H:i:s', $lastTs + ($cooldownMinutes * 60));
+                    $cooldownActive = time() < strtotime((string) $nextDispatchAllowedAt);
+                }
+            }
+        }
+
+        return [
+            'last_dispatch_at' => $lastDispatchAt,
+            'last_dispatch_level' => $lastDispatchLevel,
+            'last_dispatch_reason' => $lastDispatchReason,
+            'next_dispatch_allowed_at' => $nextDispatchAllowedAt,
+            'cooldown_active' => $cooldownActive,
+            'last_critical_reason' => $lastDispatchReason,
         ];
     }
 

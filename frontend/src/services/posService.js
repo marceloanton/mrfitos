@@ -146,6 +146,11 @@ export async function exportPosAlertDispatchHistoryCsv(params = {}) {
   return data;
 }
 
+export async function getPosAlertsStatus(params = {}) {
+  const { data } = await api.get('/pos/alerts/status', { params });
+  return payload(data);
+}
+
 export async function listPosAlertContacts() {
   const { data } = await api.get('/pos/alerts/contacts');
   return payload(data);

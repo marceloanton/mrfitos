@@ -342,6 +342,24 @@ final class PosController
         }
     }
 
+    public function alertsStatus(): void
+    {
+        $auth = json_decode($_SERVER['auth_user'] ?? '{}', true) ?: [];
+        $cooldownMinutes = Request::query('cooldown_minutes', null);
+        try {
+            $data = $this->service->getOperationalAlertsStatus(
+                (int) ($auth['tenant_id'] ?? 0),
+                (int) ($auth['gym_id'] ?? 0),
+                $cooldownMinutes
+            );
+            Response::json(['success' => true, 'data' => $data]);
+        } catch (\InvalidArgumentException $e) {
+            Response::json(['success' => false, 'message' => $e->getMessage()], 422);
+        } catch (\Throwable $e) {
+            Response::json(['success' => false, 'message' => 'Failed to fetch POS alert operational status'], 500);
+        }
+    }
+
     public function dispatchHistory(): void
     {
         $auth = json_decode($_SERVER['auth_user'] ?? '{}', true) ?: [];

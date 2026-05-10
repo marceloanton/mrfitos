@@ -1507,4 +1507,9 @@ final class PosRepository
         $row = $stmt->fetch();
         return $row ?: null;
     }
+
+    public function findLatestCriticalAlertDispatch(int $tenantId, int $gymId): ?array
+    {
+        return $this->findLatestActivityByAction($tenantId, $gymId, 'pos_alert_critical_notified');
+    }
 }
