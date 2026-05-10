@@ -139,11 +139,23 @@ export default function PosPage() {
     return rangeDays <= 92;
   };
   const validateFollowupRange = () => {
+    if (followupDateFrom && followupDateTo && followupDateFrom > followupDateTo) {
+      setError('La fecha desde no puede ser mayor a la fecha hasta.');
+      return false;
+    }
     if (!isRangeWithin92Days(followupDateFrom, followupDateTo)) {
       setError('El rango de fechas no puede superar 92 días.');
       return false;
     }
     return true;
+  };
+  const applyFollowupRangePreset = (days) => {
+    const to = new Date();
+    const from = new Date();
+    from.setDate(from.getDate() - Math.max(0, days - 1));
+    setFollowupDateFrom(from.toISOString().slice(0, 10));
+    setFollowupDateTo(to.toISOString().slice(0, 10));
+    setError('');
   };
 
   const load = async () => {
@@ -964,6 +976,15 @@ ${sale.notes ? `Nota: ${sale.notes}` : ''}
         <div className="mb-3 flex flex-wrap items-end gap-2">
           <input className="rounded border border-slate-300 p-2 text-sm" type="date" value={followupDateFrom} onChange={(e) => setFollowupDateFrom(e.target.value)} />
           <input className="rounded border border-slate-300 p-2 text-sm" type="date" value={followupDateTo} onChange={(e) => setFollowupDateTo(e.target.value)} />
+          <button className="rounded border border-slate-300 px-2 py-2 text-xs" onClick={() => applyFollowupRangePreset(7)}>
+            7d
+          </button>
+          <button className="rounded border border-slate-300 px-2 py-2 text-xs" onClick={() => applyFollowupRangePreset(30)}>
+            30d
+          </button>
+          <button className="rounded border border-slate-300 px-2 py-2 text-xs" onClick={() => applyFollowupRangePreset(90)}>
+            90d
+          </button>
           <button className="rounded border border-slate-300 px-3 py-2 text-sm" onClick={load}>
             Actualizar Embudo
           </button>
