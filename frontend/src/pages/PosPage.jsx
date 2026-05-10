@@ -119,6 +119,7 @@ export default function PosPage() {
   const [collectorRanking, setCollectorRanking] = useState([]);
   const [collectorRankingLimit, setCollectorRankingLimit] = useState('25');
   const [collectorRankingSortBy, setCollectorRankingSortBy] = useState('recovered_amount');
+  const [collectorRankingSortDir, setCollectorRankingSortDir] = useState('desc');
   const [collectorRankingSummary, setCollectorRankingSummary] = useState({
     collectors_count: 0,
     total_recovered_amount: 0,
@@ -231,7 +232,7 @@ export default function PosPage() {
           date_to: followupDateTo || undefined,
           limit: Number(collectorRankingLimit || 25),
           sort_by: collectorRankingSortBy,
-          sort_dir: 'desc'
+          sort_dir: collectorRankingSortDir
         })
       ]);
       setSales(Array.isArray(salesData?.items) ? salesData.items : []);
@@ -327,6 +328,9 @@ export default function PosPage() {
       if (parsed && ['recovered_amount', 'response_rate', 'contacts_count'].includes(String(parsed.sort_by ?? ''))) {
         setCollectorRankingSortBy(String(parsed.sort_by));
       }
+      if (parsed && ['desc', 'asc'].includes(String(parsed.sort_dir ?? ''))) {
+        setCollectorRankingSortDir(String(parsed.sort_dir));
+      }
     } catch {
       // ignore broken local preferences
     }
@@ -336,9 +340,10 @@ export default function PosPage() {
     if (!collectorPrefsStorageKey) return;
     localStorage.setItem(collectorPrefsStorageKey, JSON.stringify({
       limit: collectorRankingLimit,
-      sort_by: collectorRankingSortBy
+      sort_by: collectorRankingSortBy,
+      sort_dir: collectorRankingSortDir
     }));
-  }, [collectorPrefsStorageKey, collectorRankingLimit, collectorRankingSortBy]);
+  }, [collectorPrefsStorageKey, collectorRankingLimit, collectorRankingSortBy, collectorRankingSortDir]);
 
   const onAdjustStock = async () => {
     setError('');
@@ -965,7 +970,7 @@ ${sale.notes ? `Nota: ${sale.notes}` : ''}
         date_to: followupDateTo || undefined,
         limit: Number(collectorRankingLimit || 25),
         sort_by: collectorRankingSortBy,
-        sort_dir: 'desc'
+        sort_dir: collectorRankingSortDir
       });
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -1039,6 +1044,10 @@ ${sale.notes ? `Nota: ${sale.notes}` : ''}
             <option value="response_rate">Orden: Tasa respuesta</option>
             <option value="contacts_count">Orden: Contactos</option>
           </select>
+          <select className="rounded border border-slate-300 p-2 text-sm" value={collectorRankingSortDir} onChange={(e) => setCollectorRankingSortDir(e.target.value)}>
+            <option value="desc">Dirección: Mayor a menor</option>
+            <option value="asc">Dirección: Menor a mayor</option>
+          </select>
           <button className="rounded border border-slate-300 px-2 py-2 text-xs" onClick={() => applyFollowupRangePreset(7)}>
             7d
           </button>
@@ -1094,7 +1103,7 @@ ${sale.notes ? `Nota: ${sale.notes}` : ''}
             <div className="rounded border border-slate-200 p-2">
               <p className="text-xs text-slate-500">Top cobrador</p>
               <p className="text-sm font-semibold text-slate-900">{collectorRankingSummary.top_collector_name || '-'}</p>
-              <p className="text-xs text-slate-500">${collectorRankingSummary.top_collector_recovered_amount.toFixed(2)}</p>
+              <p className="text-xs text-slate-500">${collectorRankingSummary.top_collector_recovered_amount.toFixed(2)} · {collectorRankingSummary.total_contacts_count} contactos</p>
             </div>
           </div>
           {collectorCommissionRules && (
