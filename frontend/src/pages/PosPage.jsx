@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { adjustStock, closeCashSession, createPosAlertContact, createPosProduct, createPosSale, deletePosAlertContact, exportPosAlertDispatchHistoryCsv, exportPosAuditCsv, exportPosZCloseCsv, getCashByOperatorReport, getCashSessionReport, getOpenCashSessionSummary, getPosAlertNotifyLink, getPosAlerts, getPosAlertsStatus, getPosConfig, getPosSaleReceipt, getPosSaleReceiptByNumber, getPosSummary, getPosZCloseReport, listCashSessions, listLowStockProducts, listMemberAccountCharges, listPosAlertContacts, listPosAlertDispatchHistory, listPosAlertsCronHistory, listPosAudit, listPosProducts, listPosSales, listStockMovements, notifyCriticalPosAlert, openCashSession, settleMemberAccountCharge, updatePosAlertContact, updatePosConfig, voidPosSale } from '../services/posService';
+import { adjustStock, autoSettleMemberAccountCharges, closeCashSession, createPosAlertContact, createPosProduct, createPosSale, deletePosAlertContact, exportPosAlertDispatchHistoryCsv, exportPosAuditCsv, exportPosZCloseCsv, getCashByOperatorReport, getCashSessionReport, getOpenCashSessionSummary, getPosAlertNotifyLink, getPosAlerts, getPosAlertsStatus, getPosConfig, getPosSaleReceipt, getPosSaleReceiptByNumber, getPosSummary, getPosZCloseReport, listCashSessions, listLowStockProducts, listMemberAccountCharges, listPosAlertContacts, listPosAlertDispatchHistory, listPosAlertsCronHistory, listPosAudit, listPosProducts, listPosSales, listStockMovements, notifyCriticalPosAlert, openCashSession, settleMemberAccountCharge, updatePosAlertContact, updatePosConfig, voidPosSale } from '../services/posService';
 import { useAuthStore } from '../stores/authStore';
 
 export default function PosPage() {
@@ -26,6 +26,9 @@ export default function PosPage() {
   const [message, setMessage] = useState('');
   const [sales, setSales] = useState([]);
   const [charges, setCharges] = useState([]);
+  const [autoSettleMethod, setAutoSettleMethod] = useState('transfer');
+  const [autoSettleLimit, setAutoSettleLimit] = useState('50');
+  const [autoSettleLoading, setAutoSettleLoading] = useState(false);
   const [products, setProducts] = useState([]);
   const [newProduct, setNewProduct] = useState({ code: '', name: '', price: '', stock_qty: '' });
   const [stockMovement, setStockMovement] = useState({ product_id: '', movement_type: 'in', qty: '', notes: '' });
@@ -600,6 +603,24 @@ ${sale.notes ? `Nota: ${sale.notes}` : ''}
     }
   };
 
+  const onAutoSettleCharges = async () => {
+    setError('');
+    setMessage('');
+    setAutoSettleLoading(true);
+    try {
+      const data = await autoSettleMemberAccountCharges({
+        method: autoSettleMethod,
+        limit: Number(autoSettleLimit || 50)
+      });
+      setMessage(`Auto-débito ejecutado: procesados ${data.processed}, cobrados ${data.settled}, fallidos ${data.failed}.`);
+      await load();
+    } catch (err) {
+      setError(err?.response?.data?.message ?? 'No se pudo ejecutar el auto-débito por lote.');
+    } finally {
+      setAutoSettleLoading(false);
+    }
+  };
+
   const onCreateProduct = async () => {
     setError('');
     setMessage('');
@@ -867,6 +888,35 @@ ${sale.notes ? `Nota: ${sale.notes}` : ''}
 
       <div className="rounded-xl bg-white p-4 shadow-sm">
         <h3 className="mb-2 text-lg font-semibold text-slate-900">Cargos pendientes (cuenta socio)</h3>
+        <div className="mb-3 flex flex-wrap items-center gap-2 rounded border border-slate-200 bg-slate-50 p-2">
+          <select
+            className="rounded border border-slate-300 p-2 text-sm"
+            value={autoSettleMethod}
+            onChange={(e) => setAutoSettleMethod(e.target.value)}
+          >
+            <option value="transfer">Transferencia</option>
+            <option value="mercadopago">Mercado Pago</option>
+            <option value="card">Tarjeta</option>
+            <option value="cash">Efectivo</option>
+            <option value="other">Otro</option>
+          </select>
+          <input
+            className="w-28 rounded border border-slate-300 p-2 text-sm"
+            type="number"
+            min="1"
+            max="500"
+            value={autoSettleLimit}
+            onChange={(e) => setAutoSettleLimit(e.target.value)}
+            placeholder="Límite"
+          />
+          <button
+            className="rounded border border-slate-300 px-3 py-2 text-sm disabled:opacity-50"
+            disabled={!canSaleCreate || autoSettleLoading}
+            onClick={onAutoSettleCharges}
+          >
+            {autoSettleLoading ? 'Procesando...' : 'Ejecutar auto-débito'}
+          </button>
+        </div>
         <div className="space-y-2">
           {charges.length === 0 ? (
             <p className="text-sm text-slate-500">Sin cargos pendientes.</p>

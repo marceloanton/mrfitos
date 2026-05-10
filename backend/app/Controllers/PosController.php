@@ -171,6 +171,31 @@ final class PosController
         }
     }
 
+    public function autoSettleMemberAccount(): void
+    {
+        $auth = json_decode($_SERVER['auth_user'] ?? '{}', true) ?: [];
+        try {
+            $input = Request::json();
+            $limit = (int) ($input['limit'] ?? 100);
+            $method = strtolower(trim((string) ($input['method'] ?? 'transfer')));
+            $data = $this->service->settlePendingMemberAccountCharges(
+                (int) ($auth['tenant_id'] ?? 0),
+                (int) ($auth['gym_id'] ?? 0),
+                $limit,
+                $method
+            );
+            Response::json([
+                'success' => true,
+                'message' => 'POS member account auto-settlement executed',
+                'data' => $data
+            ]);
+        } catch (\InvalidArgumentException $e) {
+            Response::json(['success' => false, 'message' => $e->getMessage()], 422);
+        } catch (\Throwable $e) {
+            Response::json(['success' => false, 'message' => 'Failed to auto-settle member account charges'], 500);
+        }
+    }
+
     public function adjustStock(): void
     {
         $auth = json_decode($_SERVER['auth_user'] ?? '{}', true) ?: [];

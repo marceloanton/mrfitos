@@ -70,6 +70,11 @@ export async function settleMemberAccountCharge(id, body = {}) {
   return payload(data);
 }
 
+export async function autoSettleMemberAccountCharges(body = {}) {
+  const { data } = await api.post('/pos/member-account/auto-settle', body);
+  return payload(data);
+}
+
 export async function listStockMovements(params = {}) {
   const { data } = await api.get('/pos/stock/movements', { params });
   return payload(data);
