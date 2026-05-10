@@ -318,6 +318,30 @@ final class PosController
         }
     }
 
+    public function alerts(): void
+    {
+        $auth = json_decode($_SERVER['auth_user'] ?? '{}', true) ?: [];
+        $dateFrom = Request::query('date_from', null);
+        $dateTo = Request::query('date_to', null);
+        $differenceThreshold = Request::query('difference_threshold', null);
+        $voidsThreshold = Request::query('voids_threshold', null);
+        try {
+            $data = $this->service->getOperationalAlerts(
+                (int) ($auth['tenant_id'] ?? 0),
+                (int) ($auth['gym_id'] ?? 0),
+                $dateFrom,
+                $dateTo,
+                $differenceThreshold,
+                $voidsThreshold
+            );
+            Response::json(['success' => true, 'data' => $data]);
+        } catch (\InvalidArgumentException $e) {
+            Response::json(['success' => false, 'message' => $e->getMessage()], 422);
+        } catch (\Throwable $e) {
+            Response::json(['success' => false, 'message' => 'Failed to build POS operational alerts'], 500);
+        }
+    }
+
     public function zCloseReportExport(): void
     {
         $auth = json_decode($_SERVER['auth_user'] ?? '{}', true) ?: [];

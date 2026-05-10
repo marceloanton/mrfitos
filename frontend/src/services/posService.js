@@ -118,6 +118,11 @@ export async function exportPosAuditCsv(params = {}) {
   return data;
 }
 
+export async function getPosAlerts(params = {}) {
+  const { data } = await api.get('/pos/alerts', { params });
+  return payload(data);
+}
+
 export async function getCashSessionReport(id) {
   const { data } = await api.get(`/pos/cash-sessions/${id}/report`);
   return payload(data);

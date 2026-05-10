@@ -6,6 +6,86 @@ use Core\Database;
 
 final class PosRepository
 {
+    public function getHighCashDifferences(
+        int $tenantId,
+        int $gymId,
+        ?string $dateFrom,
+        ?string $dateTo,
+        float $differenceThreshold
+    ): array {
+        $where = 'tenant_id = :tenant_id
+                  AND gym_id = :gym_id
+                  AND status = "closed"
+                  AND closed_at IS NOT NULL
+                  AND ABS(COALESCE(difference_amount, 0)) > :difference_threshold';
+        $params = [
+            'tenant_id' => $tenantId,
+            'gym_id' => $gymId,
+            'difference_threshold' => $differenceThreshold,
+        ];
+
+        if ($dateFrom !== null) {
+            $where .= ' AND DATE(closed_at) >= :date_from';
+            $params['date_from'] = $dateFrom;
+        }
+        if ($dateTo !== null) {
+            $where .= ' AND DATE(closed_at) <= :date_to';
+            $params['date_to'] = $dateTo;
+        }
+
+        $stmt = Database::connection()->prepare(
+            "SELECT id AS cash_session_id, closed_by_user_id AS user_id, opened_at, closed_at, difference_amount
+             FROM pos_cash_sessions
+             WHERE {$where}
+             ORDER BY ABS(COALESCE(difference_amount, 0)) DESC, id DESC"
+        );
+        $stmt->execute($params);
+        return $stmt->fetchAll() ?: [];
+    }
+
+    public function getUnusualVoidsByOperator(
+        int $tenantId,
+        int $gymId,
+        ?string $dateFrom,
+        ?string $dateTo,
+        int $voidsThreshold
+    ): array {
+        $where = 'al.tenant_id = :tenant_id
+                  AND al.gym_id = :gym_id
+                  AND al.entity_type = "pos_sale"
+                  AND (
+                      al.action = "void"
+                      OR al.action = "pos_void"
+                      OR al.action LIKE "pos_void\_%"
+                  )
+                  AND al.user_id IS NOT NULL';
+        $params = [
+            'tenant_id' => $tenantId,
+            'gym_id' => $gymId,
+            'voids_threshold' => $voidsThreshold,
+        ];
+
+        if ($dateFrom !== null) {
+            $where .= ' AND al.created_at >= :date_from_dt';
+            $params['date_from_dt'] = $dateFrom . ' 00:00:00';
+        }
+        if ($dateTo !== null) {
+            $where .= ' AND al.created_at <= :date_to_dt';
+            $params['date_to_dt'] = $dateTo . ' 23:59:59';
+        }
+
+        $stmt = Database::connection()->prepare(
+            "SELECT al.user_id, COUNT(*) AS void_count
+             FROM activity_logs al
+             WHERE {$where}
+             GROUP BY al.user_id
+             HAVING COUNT(*) > :voids_threshold
+             ORDER BY void_count DESC, al.user_id ASC"
+        );
+        $stmt->execute($params);
+        return $stmt->fetchAll() ?: [];
+    }
+
     public function listPosAudit(
         int $tenantId,
         int $gymId,

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { adjustStock, closeCashSession, createPosProduct, createPosSale, exportPosAuditCsv, exportPosZCloseCsv, getCashByOperatorReport, getCashSessionReport, getOpenCashSessionSummary, getPosConfig, getPosSaleReceipt, getPosSaleReceiptByNumber, getPosSummary, getPosZCloseReport, listCashSessions, listLowStockProducts, listMemberAccountCharges, listPosAudit, listPosProducts, listPosSales, listStockMovements, openCashSession, settleMemberAccountCharge, updatePosConfig, voidPosSale } from '../services/posService';
+import { adjustStock, closeCashSession, createPosProduct, createPosSale, exportPosAuditCsv, exportPosZCloseCsv, getCashByOperatorReport, getCashSessionReport, getOpenCashSessionSummary, getPosAlerts, getPosConfig, getPosSaleReceipt, getPosSaleReceiptByNumber, getPosSummary, getPosZCloseReport, listCashSessions, listLowStockProducts, listMemberAccountCharges, listPosAudit, listPosProducts, listPosSales, listStockMovements, openCashSession, settleMemberAccountCharge, updatePosConfig, voidPosSale } from '../services/posService';
 import { useAuthStore } from '../stores/authStore';
 
 export default function PosPage() {
@@ -47,6 +47,13 @@ export default function PosPage() {
     action: '',
     user_id: ''
   });
+  const [alertFilters, setAlertFilters] = useState({
+    date_from: '',
+    date_to: '',
+    difference_threshold: '0',
+    voids_threshold: '3'
+  });
+  const [posAlerts, setPosAlerts] = useState({ high_cash_differences: [], unusual_voids_by_operator: [] });
   const [summary, setSummary] = useState({
     today_sales_count: 0,
     today_sales_total: 0,
@@ -56,7 +63,7 @@ export default function PosPage() {
 
   const load = async () => {
     try {
-      const [salesData, chargesData, productsData, movementsData, openCashData, cashSessionsData, posConfig, summaryData, lowStockData, cashByOperatorData, auditData] = await Promise.all([
+      const [salesData, chargesData, productsData, movementsData, openCashData, cashSessionsData, posConfig, summaryData, lowStockData, cashByOperatorData, auditData, alertsData] = await Promise.all([
         listPosSales({ page: 1, per_page: 20 }),
         listMemberAccountCharges({ status: 'pending_auto_debit', page: 1, per_page: 20 }),
         listPosProducts(),
@@ -74,6 +81,12 @@ export default function PosPage() {
           date_to: auditFilters.date_to || undefined,
           action: auditFilters.action || undefined,
           user_id: auditFilters.user_id ? Number(auditFilters.user_id) : undefined
+        }),
+        getPosAlerts({
+          date_from: alertFilters.date_from || undefined,
+          date_to: alertFilters.date_to || undefined,
+          difference_threshold: Number(alertFilters.difference_threshold || 0),
+          voids_threshold: Number(alertFilters.voids_threshold || 3)
         })
       ]);
       setSales(Array.isArray(salesData?.items) ? salesData.items : []);
@@ -95,6 +108,10 @@ export default function PosPage() {
         operators: Array.isArray(cashByOperatorData?.operators) ? cashByOperatorData.operators : []
       });
       setAuditRows(Array.isArray(auditData?.items) ? auditData.items : []);
+      setPosAlerts({
+        high_cash_differences: Array.isArray(alertsData?.high_cash_differences) ? alertsData.high_cash_differences : [],
+        unusual_voids_by_operator: Array.isArray(alertsData?.unusual_voids_by_operator) ? alertsData.unusual_voids_by_operator : []
+      });
     } catch {
       // no-op
     }
@@ -841,6 +858,45 @@ ${sale.notes ? `Nota: ${sale.notes}` : ''}
           )) : (
             <p className="text-sm text-slate-500">Sin datos por operador.</p>
           )}
+        </div>
+      </div>
+
+      <div className="rounded-xl bg-white p-4 shadow-sm">
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <h3 className="text-lg font-semibold text-slate-900">Alertas de Riesgo POS</h3>
+          <button className="rounded border border-slate-300 px-2 py-1 text-sm disabled:opacity-50" disabled={!canReportRead} onClick={load}>
+            Actualizar alertas
+          </button>
+        </div>
+        <div className="mb-3 grid gap-2 md:grid-cols-4">
+          <input className="rounded border border-slate-300 p-2 text-sm" type="date" value={alertFilters.date_from} onChange={(e) => setAlertFilters((s) => ({ ...s, date_from: e.target.value }))} />
+          <input className="rounded border border-slate-300 p-2 text-sm" type="date" value={alertFilters.date_to} onChange={(e) => setAlertFilters((s) => ({ ...s, date_to: e.target.value }))} />
+          <input className="rounded border border-slate-300 p-2 text-sm" placeholder="Umbral diferencia" value={alertFilters.difference_threshold} onChange={(e) => setAlertFilters((s) => ({ ...s, difference_threshold: e.target.value }))} />
+          <input className="rounded border border-slate-300 p-2 text-sm" placeholder="Umbral anulaciones" value={alertFilters.voids_threshold} onChange={(e) => setAlertFilters((s) => ({ ...s, voids_threshold: e.target.value }))} />
+        </div>
+        <div className="mb-3">
+          <p className="mb-1 text-sm font-medium text-slate-800">Diferencias de caja altas</p>
+          <div className="space-y-2">
+            {posAlerts.high_cash_differences.length === 0 ? (
+              <p className="rounded border border-emerald-200 bg-emerald-50 p-2 text-sm text-emerald-800">Sin alertas de diferencia alta.</p>
+            ) : posAlerts.high_cash_differences.map((a) => (
+                <div key={a.cash_session_id} className="rounded border border-rose-200 bg-rose-50 p-2 text-sm text-rose-900">
+                  Caja #{a.cash_session_id} · user {a.user_id ?? '-'} · diferencia {a.difference_amount} · {a.opened_at} {'->'} {a.closed_at ?? '-'}
+                </div>
+              ))}
+          </div>
+        </div>
+        <div>
+          <p className="mb-1 text-sm font-medium text-slate-800">Anulaciones inusuales por operador</p>
+          <div className="space-y-2">
+            {posAlerts.unusual_voids_by_operator.length === 0 ? (
+              <p className="rounded border border-emerald-200 bg-emerald-50 p-2 text-sm text-emerald-800">Sin anulaciones inusuales.</p>
+            ) : posAlerts.unusual_voids_by_operator.map((a) => (
+              <div key={String(a.user_id)} className="rounded border border-amber-200 bg-amber-50 p-2 text-sm text-amber-900">
+                user {a.user_id ?? '-'} · anulaciones {a.void_count}
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 

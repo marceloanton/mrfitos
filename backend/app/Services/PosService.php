@@ -686,6 +686,52 @@ final class PosService
         ];
     }
 
+    public function getOperationalAlerts(
+        int $tenantId,
+        int $gymId,
+        mixed $dateFromInput,
+        mixed $dateToInput,
+        mixed $differenceThresholdInput,
+        mixed $voidsThresholdInput
+    ): array {
+        $filters = $this->resolveOperationalAlertFilters(
+            $dateFromInput,
+            $dateToInput,
+            $differenceThresholdInput,
+            $voidsThresholdInput
+        );
+
+        $cashRows = $this->repo->getHighCashDifferences(
+            $tenantId,
+            $gymId,
+            $filters['date_from'],
+            $filters['date_to'],
+            $filters['difference_threshold']
+        );
+        $voidRows = $this->repo->getUnusualVoidsByOperator(
+            $tenantId,
+            $gymId,
+            $filters['date_from'],
+            $filters['date_to'],
+            $filters['voids_threshold']
+        );
+
+        return [
+            'filters' => $filters,
+            'high_cash_differences' => array_map(static fn (array $row): array => [
+                'cash_session_id' => (int) ($row['cash_session_id'] ?? 0),
+                'user_id' => isset($row['user_id']) ? (int) $row['user_id'] : null,
+                'opened_at' => (string) ($row['opened_at'] ?? ''),
+                'closed_at' => (string) ($row['closed_at'] ?? ''),
+                'difference_amount' => (float) ($row['difference_amount'] ?? 0),
+            ], $cashRows),
+            'unusual_voids_by_operator' => array_map(static fn (array $row): array => [
+                'user_id' => (int) ($row['user_id'] ?? 0),
+                'void_count' => (int) ($row['void_count'] ?? 0),
+            ], $voidRows),
+        ];
+    }
+
     public function getCashSessionReport(int $tenantId, int $gymId, int $cashSessionId): array
     {
         if ($cashSessionId <= 0) {
@@ -938,6 +984,48 @@ final class PosService
             'date_from' => $dateFrom,
             'date_to' => $dateTo,
             'user_id' => $this->resolveOptionalUserId($userIdInput),
+        ];
+    }
+
+    private function resolveOperationalAlertFilters(
+        mixed $dateFromInput,
+        mixed $dateToInput,
+        mixed $differenceThresholdInput,
+        mixed $voidsThresholdInput
+    ): array {
+        $dateFrom = $this->resolveOptionalDate($dateFromInput, 'date_from');
+        $dateTo = $this->resolveOptionalDate($dateToInput, 'date_to');
+        if ($dateFrom !== null && $dateTo !== null && $dateFrom > $dateTo) {
+            throw new \InvalidArgumentException('date_from must be <= date_to');
+        }
+
+        $differenceThreshold = 0.0;
+        if ($differenceThresholdInput !== null && $differenceThresholdInput !== '') {
+            if (!is_numeric($differenceThresholdInput)) {
+                throw new \InvalidArgumentException('difference_threshold must be numeric');
+            }
+            $differenceThreshold = (float) $differenceThresholdInput;
+            if ($differenceThreshold < 0 || $differenceThreshold > 1000000000) {
+                throw new \InvalidArgumentException('difference_threshold must be >= 0 and <= 1000000000');
+            }
+        }
+
+        $voidsThreshold = 3;
+        if ($voidsThresholdInput !== null && $voidsThresholdInput !== '') {
+            if (!is_numeric($voidsThresholdInput)) {
+                throw new \InvalidArgumentException('voids_threshold must be an integer');
+            }
+            $voidsThreshold = (int) $voidsThresholdInput;
+            if ($voidsThreshold < 0 || $voidsThreshold > 10000) {
+                throw new \InvalidArgumentException('voids_threshold must be >= 0 and <= 10000');
+            }
+        }
+
+        return [
+            'date_from' => $dateFrom,
+            'date_to' => $dateTo,
+            'difference_threshold' => $differenceThreshold,
+            'voids_threshold' => $voidsThreshold,
         ];
     }
 
