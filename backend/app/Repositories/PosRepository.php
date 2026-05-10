@@ -470,6 +470,27 @@ final class PosRepository
         return $stmt->fetchAll() ?: [];
     }
 
+    public function listLowStockProducts(int $tenantId, int $gymId, float $threshold): array
+    {
+        $stmt = Database::connection()->prepare(
+            'SELECT id, code, name, stock_qty, price, currency
+             FROM pos_products
+             WHERE tenant_id = :tenant_id
+               AND gym_id = :gym_id
+               AND deleted_at IS NULL
+               AND is_active = 1
+               AND track_stock = 1
+               AND stock_qty <= :threshold
+             ORDER BY stock_qty ASC, id DESC'
+        );
+        $stmt->execute([
+            'tenant_id' => $tenantId,
+            'gym_id' => $gymId,
+            'threshold' => $threshold
+        ]);
+        return $stmt->fetchAll() ?: [];
+    }
+
     public function createProduct(array $data): int
     {
         $stmt = Database::connection()->prepare(

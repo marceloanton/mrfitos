@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { adjustStock, closeCashSession, createPosProduct, createPosSale, exportPosZCloseCsv, getCashSessionReport, getOpenCashSessionSummary, getPosConfig, getPosSaleReceipt, getPosSaleReceiptByNumber, getPosSummary, getPosZCloseReport, listCashSessions, listMemberAccountCharges, listPosProducts, listPosSales, listStockMovements, openCashSession, settleMemberAccountCharge, updatePosConfig } from '../services/posService';
+import { adjustStock, closeCashSession, createPosProduct, createPosSale, exportPosZCloseCsv, getCashSessionReport, getOpenCashSessionSummary, getPosConfig, getPosSaleReceipt, getPosSaleReceiptByNumber, getPosSummary, getPosZCloseReport, listCashSessions, listLowStockProducts, listMemberAccountCharges, listPosProducts, listPosSales, listStockMovements, openCashSession, settleMemberAccountCharge, updatePosConfig } from '../services/posService';
 
 export default function PosPage() {
   const [requireOpenCash, setRequireOpenCash] = useState(true);
@@ -27,6 +27,8 @@ export default function PosPage() {
   const [closingAmount, setClosingAmount] = useState('');
   const [receiptNumber, setReceiptNumber] = useState('');
   const [zCloseDate, setZCloseDate] = useState(new Date().toISOString().slice(0, 10));
+  const [lowStockThreshold, setLowStockThreshold] = useState('5');
+  const [lowStockItems, setLowStockItems] = useState([]);
   const [summary, setSummary] = useState({
     today_sales_count: 0,
     today_sales_total: 0,
@@ -36,7 +38,7 @@ export default function PosPage() {
 
   const load = async () => {
     try {
-      const [salesData, chargesData, productsData, movementsData, openCashData, cashSessionsData, posConfig, summaryData] = await Promise.all([
+      const [salesData, chargesData, productsData, movementsData, openCashData, cashSessionsData, posConfig, summaryData, lowStockData] = await Promise.all([
         listPosSales({ page: 1, per_page: 20 }),
         listMemberAccountCharges({ status: 'pending_auto_debit', page: 1, per_page: 20 }),
         listPosProducts(),
@@ -44,7 +46,8 @@ export default function PosPage() {
         getOpenCashSessionSummary(),
         listCashSessions({ page: 1, per_page: 10 }),
         getPosConfig(),
-        getPosSummary()
+        getPosSummary(),
+        listLowStockProducts({ threshold: Number(lowStockThreshold || 5) })
       ]);
       setSales(Array.isArray(salesData?.items) ? salesData.items : []);
       setCharges(Array.isArray(chargesData?.items) ? chargesData.items : []);
@@ -59,6 +62,7 @@ export default function PosPage() {
         today_cash_collected: Number(summaryData?.today_cash_collected ?? 0),
         pending_member_account_total: Number(summaryData?.pending_member_account_total ?? 0)
       });
+      setLowStockItems(Array.isArray(lowStockData?.items) ? lowStockData.items : []);
     } catch {
       // no-op
     }
@@ -348,6 +352,16 @@ ${sale.notes ? `Nota: ${sale.notes}` : ''}
     }
   };
 
+  const onRefreshLowStock = async () => {
+    setError('');
+    try {
+      const data = await listLowStockProducts({ threshold: Number(lowStockThreshold || 5) });
+      setLowStockItems(Array.isArray(data?.items) ? data.items : []);
+    } catch (err) {
+      setError(err?.response?.data?.message ?? 'No se pudo cargar stock bajo.');
+    }
+  };
+
   useEffect(() => {
     load();
   }, []);
@@ -505,6 +519,34 @@ ${sale.notes ? `Nota: ${sale.notes}` : ''}
         <button className="rounded border border-slate-300 p-2" onClick={onCreateProduct}>
           Crear producto POS
         </button>
+      </div>
+
+      <div className="rounded-xl bg-white p-4 shadow-sm">
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <h3 className="text-lg font-semibold text-slate-900">Alertas de stock bajo</h3>
+          <div className="flex items-center gap-2">
+            <input
+              className="w-24 rounded border border-slate-300 p-2 text-sm"
+              type="number"
+              min="0.001"
+              step="0.001"
+              value={lowStockThreshold}
+              onChange={(e) => setLowStockThreshold(e.target.value)}
+            />
+            <button className="rounded border border-slate-300 px-2 py-1 text-sm" onClick={onRefreshLowStock}>
+              Refrescar
+            </button>
+          </div>
+        </div>
+        <div className="space-y-2">
+          {lowStockItems.length === 0 ? (
+            <p className="text-sm text-slate-500">Sin alertas para ese umbral.</p>
+          ) : lowStockItems.map((p) => (
+            <div key={p.id} className="rounded border border-amber-200 bg-amber-50 p-2 text-sm text-amber-900">
+              {p.code} · {p.name} · stock {p.stock_qty} · precio {p.price} {p.currency}
+            </div>
+          ))}
+        </div>
       </div>
 
       <div className="rounded-xl bg-white p-4 shadow-sm">

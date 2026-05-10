@@ -23,6 +23,23 @@ final class PosController
         ]);
     }
 
+    public function lowStockProducts(): void
+    {
+        $auth = json_decode($_SERVER['auth_user'] ?? '{}', true) ?: [];
+        $threshold = Request::query('threshold', null);
+        try {
+            $data = $this->service->listLowStockProducts((int) $auth['tenant_id'], (int) $auth['gym_id'], $threshold);
+            Response::json([
+                'success' => true,
+                'data' => $data
+            ]);
+        } catch (\InvalidArgumentException $e) {
+            Response::json(['success' => false, 'message' => $e->getMessage()], 422);
+        } catch (\Throwable $e) {
+            Response::json(['success' => false, 'message' => 'Failed to fetch low stock products'], 500);
+        }
+    }
+
     public function summary(): void
     {
         $auth = json_decode($_SERVER['auth_user'] ?? '{}', true) ?: [];

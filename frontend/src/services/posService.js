@@ -40,6 +40,11 @@ export async function listPosProducts() {
   return Array.isArray(p?.items) ? p.items : [];
 }
 
+export async function listLowStockProducts(params = {}) {
+  const { data } = await api.get('/pos/products/low-stock', { params });
+  return payload(data);
+}
+
 export async function createPosProduct(body) {
   const { data } = await api.post('/pos/products', body);
   return payload(data);

@@ -111,6 +111,7 @@ $router->add('GET', '/attendance', [AttendanceController::class, 'index'], [Auth
 $router->add('POST', '/attendance/check-in', [AttendanceController::class, 'checkIn'], [new RateLimitMiddleware('attendance_checkin', 120, 60), AuthMiddleware::class, TenantMiddleware::class, new FeatureGateMiddleware('attendance'), new PermissionMiddleware('attendance.write')]);
 $router->add('POST', '/attendance/check-out', [AttendanceController::class, 'checkOut'], [new RateLimitMiddleware('attendance_checkout', 120, 60), AuthMiddleware::class, TenantMiddleware::class, new FeatureGateMiddleware('attendance'), new PermissionMiddleware('attendance.write')]);
 $router->add('POST', '/tracking/events', [TrackingController::class, 'storeEvent'], [new RateLimitMiddleware('tracking_events', 120, 60), AuthMiddleware::class, TenantMiddleware::class]);
+$router->add('GET', '/pos/products/low-stock', [PosController::class, 'lowStockProducts'], [AuthMiddleware::class, TenantMiddleware::class, new PermissionMiddleware('payments.read')]);
 $router->add('GET', '/pos/products', [PosController::class, 'products'], [AuthMiddleware::class, TenantMiddleware::class, new PermissionMiddleware('payments.read')]);
 $router->add('GET', '/pos/summary', [PosController::class, 'summary'], [AuthMiddleware::class, TenantMiddleware::class, new PermissionMiddleware('payments.read')]);
 $router->add('GET', '/pos/config', [PosController::class, 'config'], [AuthMiddleware::class, TenantMiddleware::class, new PermissionMiddleware('payments.read')]);

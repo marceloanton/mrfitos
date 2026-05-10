@@ -19,6 +19,26 @@ final class PosService
         return $this->repo->listProducts($tenantId, $gymId);
     }
 
+    public function listLowStockProducts(int $tenantId, int $gymId, mixed $thresholdInput): array
+    {
+        $threshold = $this->resolveLowStockThreshold($thresholdInput);
+        $rows = $this->repo->listLowStockProducts($tenantId, $gymId, $threshold);
+
+        $items = array_map(static fn (array $row): array => [
+            'id' => (int) ($row['id'] ?? 0),
+            'code' => (string) ($row['code'] ?? ''),
+            'name' => (string) ($row['name'] ?? ''),
+            'stock_qty' => (float) ($row['stock_qty'] ?? 0),
+            'price' => (float) ($row['price'] ?? 0),
+            'currency' => (string) ($row['currency'] ?? 'ARS'),
+        ], $rows);
+
+        return [
+            'threshold' => $threshold,
+            'items' => $items,
+        ];
+    }
+
     public function getSummary(int $tenantId, int $gymId): array
     {
         return $this->repo->getSummary($tenantId, $gymId);
@@ -682,5 +702,23 @@ final class PosService
         }
 
         return $raw;
+    }
+
+    private function resolveLowStockThreshold(mixed $thresholdInput): float
+    {
+        if ($thresholdInput === null || $thresholdInput === '') {
+            return 5.0;
+        }
+
+        if (!is_numeric($thresholdInput)) {
+            throw new \InvalidArgumentException('threshold must be numeric');
+        }
+
+        $threshold = (float) $thresholdInput;
+        if ($threshold <= 0 || $threshold > 10000) {
+            throw new \InvalidArgumentException('threshold must be > 0 and <= 10000');
+        }
+
+        return $threshold;
     }
 }
