@@ -53,11 +53,15 @@ final class PosController
     {
         $auth = json_decode($_SERVER['auth_user'] ?? '{}', true) ?: [];
         $date = Request::query('date', null);
+        $dateFrom = Request::query('date_from', null);
+        $dateTo = Request::query('date_to', null);
         try {
             $data = $this->service->getMemberAccountAutosettleKpi(
                 (int) ($auth['tenant_id'] ?? 0),
                 (int) ($auth['gym_id'] ?? 0),
-                is_string($date) ? $date : null
+                is_string($date) ? $date : null,
+                is_string($dateFrom) ? $dateFrom : null,
+                is_string($dateTo) ? $dateTo : null
             );
             Response::json(['success' => true, 'data' => $data]);
         } catch (\InvalidArgumentException $e) {

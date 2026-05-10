@@ -48,17 +48,78 @@ final class PosService
         return $this->repo->getSummary($tenantId, $gymId);
     }
 
-    public function getMemberAccountAutosettleKpi(int $tenantId, int $gymId, ?string $dateInput = null): array
+    public function getMemberAccountAutosettleKpi(
+        int $tenantId,
+        int $gymId,
+        ?string $dateInput = null,
+        ?string $dateFromInput = null,
+        ?string $dateToInput = null
+    ): array
     {
-        $date = $this->resolveDateOrToday($dateInput);
-        $row = $this->repo->getMemberAccountAutosettleKpi($tenantId, $gymId, $date);
+        $dateFrom = null;
+        $dateTo = null;
+        if ($dateFromInput !== null || $dateToInput !== null) {
+            $dateFrom = $this->resolveOptionalDate($dateFromInput, 'date_from');
+            $dateTo = $this->resolveOptionalDate($dateToInput, 'date_to');
+            if ($dateFrom !== null && $dateTo !== null && $dateFrom > $dateTo) {
+                throw new \InvalidArgumentException('date_from must be <= date_to');
+            }
+            if ($dateFrom === null) {
+                $dateFrom = $dateTo ?? date('Y-m-d');
+            }
+            if ($dateTo === null) {
+                $dateTo = $dateFrom;
+            }
+        } else {
+            $singleDate = $this->resolveDateOrToday($dateInput);
+            $dateFrom = $singleDate;
+            $dateTo = $singleDate;
+        }
+
+        $row = $this->repo->getMemberAccountAutosettleKpiInRange($tenantId, $gymId, $dateFrom, $dateTo);
+        $rawSeries = $this->repo->getMemberAccountAutosettleKpiDailySeries($tenantId, $gymId, $dateFrom, $dateTo);
+        $seriesMap = [];
+        foreach ($rawSeries as $s) {
+            $key = (string) ($s['date'] ?? '');
+            if ($key === '') {
+                continue;
+            }
+            $seriesMap[$key] = [
+                'date' => $key,
+                'runs_count' => (int) ($s['runs_count'] ?? 0),
+                'processed_total' => (int) ($s['processed_total'] ?? 0),
+                'settled_total' => (int) ($s['settled_total'] ?? 0),
+                'failed_total' => (int) ($s['failed_total'] ?? 0),
+                'settled_amount_total' => (float) ($s['settled_amount_total'] ?? 0),
+            ];
+        }
+
+        $series = [];
+        $cursor = strtotime($dateFrom);
+        $end = strtotime($dateTo);
+        while ($cursor !== false && $end !== false && $cursor <= $end) {
+            $d = date('Y-m-d', $cursor);
+            $series[] = $seriesMap[$d] ?? [
+                'date' => $d,
+                'runs_count' => 0,
+                'processed_total' => 0,
+                'settled_total' => 0,
+                'failed_total' => 0,
+                'settled_amount_total' => 0.0,
+            ];
+            $cursor = strtotime('+1 day', $cursor);
+        }
+
         return [
-            'date' => $date,
+            'date' => $dateFrom === $dateTo ? $dateFrom : null,
+            'date_from' => $dateFrom,
+            'date_to' => $dateTo,
             'runs_count' => (int) ($row['runs_count'] ?? 0),
             'processed_total' => (int) ($row['processed_total'] ?? 0),
             'settled_total' => (int) ($row['settled_total'] ?? 0),
             'failed_total' => (int) ($row['failed_total'] ?? 0),
             'settled_amount_total' => (float) ($row['settled_amount_total'] ?? 0),
+            'daily' => $series,
         ];
     }
 
@@ -1538,6 +1599,15 @@ final class PosService
         }
 
         return $raw;
+    }
+
+    private function resolveDateOrToday(?string $date): string
+    {
+        $raw = trim((string) ($date ?? ''));
+        if ($raw === '') {
+            return date('Y-m-d');
+        }
+        return $this->resolveReportDate($raw);
     }
 
     private function resolveLowStockThreshold(mixed $thresholdInput): float

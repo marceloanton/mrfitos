@@ -65,6 +65,12 @@ export default function PosPage() {
   const [dispatchHistoryRows, setDispatchHistoryRows] = useState([]);
   const [alertsStatus, setAlertsStatus] = useState(null);
   const [alertsCronHistoryRows, setAlertsCronHistoryRows] = useState([]);
+  const [autosettleDateFrom, setAutosettleDateFrom] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 6);
+    return d.toISOString().slice(0, 10);
+  });
+  const [autosettleDateTo, setAutosettleDateTo] = useState(() => new Date().toISOString().slice(0, 10));
   const [autosettleKpi, setAutosettleKpi] = useState({
     runs_count: 0,
     processed_total: 0,
@@ -115,7 +121,10 @@ export default function PosPage() {
         }),
         getPosAlertsStatus(),
         listPosAlertsCronHistory({ page: 1, per_page: 10 }),
-        getPosAutosettleKpi()
+        getPosAutosettleKpi({
+          date_from: autosettleDateFrom || undefined,
+          date_to: autosettleDateTo || undefined
+        })
       ]);
       setSales(Array.isArray(salesData?.items) ? salesData.items : []);
       setCharges(Array.isArray(chargesData?.items) ? chargesData.items : []);
@@ -721,6 +730,29 @@ ${sale.notes ? `Nota: ${sale.notes}` : ''}
         <div className="rounded-xl bg-white p-4 shadow-sm">
           <p className="text-xs uppercase tracking-wide text-slate-500">Total cobrado</p>
           <p className="text-2xl font-semibold text-slate-900">${autosettleKpi.settled_amount_total.toFixed(2)}</p>
+        </div>
+      </div>
+      <div className="rounded-xl bg-white p-4 shadow-sm">
+        <div className="mb-3 flex flex-wrap items-end gap-2">
+          <input className="rounded border border-slate-300 p-2 text-sm" type="date" value={autosettleDateFrom} onChange={(e) => setAutosettleDateFrom(e.target.value)} />
+          <input className="rounded border border-slate-300 p-2 text-sm" type="date" value={autosettleDateTo} onChange={(e) => setAutosettleDateTo(e.target.value)} />
+          <button className="rounded border border-slate-300 px-3 py-2 text-sm" onClick={load}>
+            Actualizar Auto-débito
+          </button>
+        </div>
+        <div className="grid grid-cols-7 gap-2">
+          {(autosettleKpi.daily || []).map((d) => {
+            const max = Math.max(1, ...((autosettleKpi.daily || []).map((x) => Number(x.settled_amount_total || 0))));
+            const h = Math.max(8, Math.round((Number(d.settled_amount_total || 0) / max) * 64));
+            return (
+              <div key={d.date} className="flex flex-col items-center gap-1">
+                <div className="flex h-16 w-full items-end justify-center rounded bg-slate-50">
+                  <div className="w-6 rounded-t bg-emerald-500" style={{ height: `${h}px` }} />
+                </div>
+                <p className="text-[10px] text-slate-500">{String(d.date).slice(5)}</p>
+              </div>
+            );
+          })}
         </div>
       </div>
 
