@@ -49,6 +49,24 @@ final class PosController
         ]);
     }
 
+    public function autosettleKpi(): void
+    {
+        $auth = json_decode($_SERVER['auth_user'] ?? '{}', true) ?: [];
+        $date = Request::query('date', null);
+        try {
+            $data = $this->service->getMemberAccountAutosettleKpi(
+                (int) ($auth['tenant_id'] ?? 0),
+                (int) ($auth['gym_id'] ?? 0),
+                is_string($date) ? $date : null
+            );
+            Response::json(['success' => true, 'data' => $data]);
+        } catch (\InvalidArgumentException $e) {
+            Response::json(['success' => false, 'message' => $e->getMessage()], 422);
+        } catch (\Throwable $e) {
+            Response::json(['success' => false, 'message' => 'Failed to fetch POS autosettle KPI'], 500);
+        }
+    }
+
     public function createProduct(): void
     {
         $auth = json_decode($_SERVER['auth_user'] ?? '{}', true) ?: [];

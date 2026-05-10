@@ -48,6 +48,20 @@ final class PosService
         return $this->repo->getSummary($tenantId, $gymId);
     }
 
+    public function getMemberAccountAutosettleKpi(int $tenantId, int $gymId, ?string $dateInput = null): array
+    {
+        $date = $this->resolveDateOrToday($dateInput);
+        $row = $this->repo->getMemberAccountAutosettleKpi($tenantId, $gymId, $date);
+        return [
+            'date' => $date,
+            'runs_count' => (int) ($row['runs_count'] ?? 0),
+            'processed_total' => (int) ($row['processed_total'] ?? 0),
+            'settled_total' => (int) ($row['settled_total'] ?? 0),
+            'failed_total' => (int) ($row['failed_total'] ?? 0),
+            'settled_amount_total' => (float) ($row['settled_amount_total'] ?? 0),
+        ];
+    }
+
     public function createProduct(int $tenantId, int $gymId, array $input): int
     {
         $name = trim((string) ($input['name'] ?? ''));

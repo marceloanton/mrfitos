@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { adjustStock, autoSettleMemberAccountCharges, closeCashSession, createPosAlertContact, createPosProduct, createPosSale, deletePosAlertContact, exportPosAlertDispatchHistoryCsv, exportPosAuditCsv, exportPosZCloseCsv, getCashByOperatorReport, getCashSessionReport, getOpenCashSessionSummary, getPosAlertNotifyLink, getPosAlerts, getPosAlertsStatus, getPosConfig, getPosSaleReceipt, getPosSaleReceiptByNumber, getPosSummary, getPosZCloseReport, listCashSessions, listLowStockProducts, listMemberAccountCharges, listPosAlertContacts, listPosAlertDispatchHistory, listPosAlertsCronHistory, listPosAudit, listPosProducts, listPosSales, listStockMovements, notifyCriticalPosAlert, openCashSession, settleMemberAccountCharge, updatePosAlertContact, updatePosConfig, voidPosSale } from '../services/posService';
+import { adjustStock, autoSettleMemberAccountCharges, closeCashSession, createPosAlertContact, createPosProduct, createPosSale, deletePosAlertContact, exportPosAlertDispatchHistoryCsv, exportPosAuditCsv, exportPosZCloseCsv, getCashByOperatorReport, getCashSessionReport, getOpenCashSessionSummary, getPosAlertNotifyLink, getPosAlerts, getPosAlertsStatus, getPosAutosettleKpi, getPosConfig, getPosSaleReceipt, getPosSaleReceiptByNumber, getPosSummary, getPosZCloseReport, listCashSessions, listLowStockProducts, listMemberAccountCharges, listPosAlertContacts, listPosAlertDispatchHistory, listPosAlertsCronHistory, listPosAudit, listPosProducts, listPosSales, listStockMovements, notifyCriticalPosAlert, openCashSession, settleMemberAccountCharge, updatePosAlertContact, updatePosConfig, voidPosSale } from '../services/posService';
 import { useAuthStore } from '../stores/authStore';
 
 export default function PosPage() {
@@ -65,6 +65,13 @@ export default function PosPage() {
   const [dispatchHistoryRows, setDispatchHistoryRows] = useState([]);
   const [alertsStatus, setAlertsStatus] = useState(null);
   const [alertsCronHistoryRows, setAlertsCronHistoryRows] = useState([]);
+  const [autosettleKpi, setAutosettleKpi] = useState({
+    runs_count: 0,
+    processed_total: 0,
+    settled_total: 0,
+    failed_total: 0,
+    settled_amount_total: 0
+  });
   const [summary, setSummary] = useState({
     today_sales_count: 0,
     today_sales_total: 0,
@@ -74,7 +81,7 @@ export default function PosPage() {
 
   const load = async () => {
     try {
-      const [salesData, chargesData, productsData, movementsData, openCashData, cashSessionsData, posConfig, summaryData, lowStockData, cashByOperatorData, auditData, alertsData, contactsData, dispatchHistoryData, alertsStatusData, alertsCronHistoryData] = await Promise.all([
+      const [salesData, chargesData, productsData, movementsData, openCashData, cashSessionsData, posConfig, summaryData, lowStockData, cashByOperatorData, auditData, alertsData, contactsData, dispatchHistoryData, alertsStatusData, alertsCronHistoryData, autosettleKpiData] = await Promise.all([
         listPosSales({ page: 1, per_page: 20 }),
         listMemberAccountCharges({ status: 'pending_auto_debit', page: 1, per_page: 20 }),
         listPosProducts(),
@@ -106,9 +113,9 @@ export default function PosPage() {
           date_from: dispatchHistoryFilters.date_from || undefined,
           date_to: dispatchHistoryFilters.date_to || undefined
         }),
-        getPosAlertsStatus()
-        ,
-        listPosAlertsCronHistory({ page: 1, per_page: 10 })
+        getPosAlertsStatus(),
+        listPosAlertsCronHistory({ page: 1, per_page: 10 }),
+        getPosAutosettleKpi()
       ]);
       setSales(Array.isArray(salesData?.items) ? salesData.items : []);
       setCharges(Array.isArray(chargesData?.items) ? chargesData.items : []);
@@ -138,6 +145,13 @@ export default function PosPage() {
       setDispatchHistoryRows(Array.isArray(dispatchHistoryData?.items) ? dispatchHistoryData.items : []);
       setAlertsStatus(alertsStatusData ?? null);
       setAlertsCronHistoryRows(Array.isArray(alertsCronHistoryData?.items) ? alertsCronHistoryData.items : []);
+      setAutosettleKpi({
+        runs_count: Number(autosettleKpiData?.runs_count ?? 0),
+        processed_total: Number(autosettleKpiData?.processed_total ?? 0),
+        settled_total: Number(autosettleKpiData?.settled_total ?? 0),
+        failed_total: Number(autosettleKpiData?.failed_total ?? 0),
+        settled_amount_total: Number(autosettleKpiData?.settled_amount_total ?? 0)
+      });
     } catch {
       // no-op
     }
@@ -684,6 +698,29 @@ ${sale.notes ? `Nota: ${sale.notes}` : ''}
         <div className="rounded-xl bg-white p-4 shadow-sm">
           <p className="text-xs uppercase tracking-wide text-slate-500">Cuenta socio pendiente</p>
           <p className="text-2xl font-semibold text-slate-900">${summary.pending_member_account_total.toFixed(2)}</p>
+        </div>
+      </div>
+
+      <div className="grid gap-3 md:grid-cols-5">
+        <div className="rounded-xl bg-white p-4 shadow-sm">
+          <p className="text-xs uppercase tracking-wide text-slate-500">Auto-débito hoy</p>
+          <p className="text-2xl font-semibold text-slate-900">{autosettleKpi.runs_count}</p>
+        </div>
+        <div className="rounded-xl bg-white p-4 shadow-sm">
+          <p className="text-xs uppercase tracking-wide text-slate-500">Cargos procesados</p>
+          <p className="text-2xl font-semibold text-slate-900">{autosettleKpi.processed_total}</p>
+        </div>
+        <div className="rounded-xl bg-white p-4 shadow-sm">
+          <p className="text-xs uppercase tracking-wide text-slate-500">Cargos cobrados</p>
+          <p className="text-2xl font-semibold text-emerald-700">{autosettleKpi.settled_total}</p>
+        </div>
+        <div className="rounded-xl bg-white p-4 shadow-sm">
+          <p className="text-xs uppercase tracking-wide text-slate-500">Fallidos</p>
+          <p className="text-2xl font-semibold text-red-700">{autosettleKpi.failed_total}</p>
+        </div>
+        <div className="rounded-xl bg-white p-4 shadow-sm">
+          <p className="text-xs uppercase tracking-wide text-slate-500">Total cobrado</p>
+          <p className="text-2xl font-semibold text-slate-900">${autosettleKpi.settled_amount_total.toFixed(2)}</p>
         </div>
       </div>
 

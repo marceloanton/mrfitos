@@ -1609,4 +1609,49 @@ final class PosRepository
     {
         return $this->findLatestActivityByAction($tenantId, $gymId, 'pos_alert_critical_notified');
     }
+
+    public function getMemberAccountAutosettleKpi(int $tenantId, int $gymId, string $date): array
+    {
+        $from = $date . ' 00:00:00';
+        $to = $date . ' 23:59:59';
+
+        $stmt = Database::connection()->prepare(
+            'SELECT
+                SUM(CASE WHEN action = "pos_member_account_autosettle_run" THEN 1 ELSE 0 END) AS runs_count,
+                COALESCE(SUM(CASE
+                    WHEN action = "pos_member_account_autosettle_run"
+                    THEN CAST(JSON_UNQUOTE(JSON_EXTRACT(metadata, "$.processed")) AS SIGNED)
+                    ELSE 0
+                END), 0) AS processed_total,
+                COALESCE(SUM(CASE
+                    WHEN action = "pos_member_account_autosettle_run"
+                    THEN CAST(JSON_UNQUOTE(JSON_EXTRACT(metadata, "$.settled")) AS SIGNED)
+                    ELSE 0
+                END), 0) AS settled_total,
+                COALESCE(SUM(CASE
+                    WHEN action = "pos_member_account_autosettle_run"
+                    THEN CAST(JSON_UNQUOTE(JSON_EXTRACT(metadata, "$.failed")) AS SIGNED)
+                    ELSE 0
+                END), 0) AS failed_total,
+                COALESCE(SUM(CASE
+                    WHEN action = "pos_member_account_charge_settled"
+                    THEN CAST(JSON_UNQUOTE(JSON_EXTRACT(metadata, "$.amount")) AS DECIMAL(12,2))
+                    ELSE 0
+                END), 0) AS settled_amount_total
+             FROM activity_logs
+             WHERE tenant_id = :tenant_id
+               AND gym_id = :gym_id
+               AND created_at >= :from_dt
+               AND created_at <= :to_dt
+               AND action IN ("pos_member_account_autosettle_run", "pos_member_account_charge_settled")'
+        );
+        $stmt->execute([
+            'tenant_id' => $tenantId,
+            'gym_id' => $gymId,
+            'from_dt' => $from,
+            'to_dt' => $to,
+        ]);
+
+        return $stmt->fetch() ?: [];
+    }
 }

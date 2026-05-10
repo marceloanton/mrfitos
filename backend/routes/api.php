@@ -114,6 +114,7 @@ $router->add('POST', '/tracking/events', [TrackingController::class, 'storeEvent
 $router->add('GET', '/pos/products/low-stock', [PosController::class, 'lowStockProducts'], [AuthMiddleware::class, TenantMiddleware::class, new PermissionMiddleware('pos.read')]);
 $router->add('GET', '/pos/products', [PosController::class, 'products'], [AuthMiddleware::class, TenantMiddleware::class, new PermissionMiddleware('pos.read')]);
 $router->add('GET', '/pos/summary', [PosController::class, 'summary'], [AuthMiddleware::class, TenantMiddleware::class, new PermissionMiddleware('pos.read')]);
+$router->add('GET', '/pos/member-account/autosettle-kpi', [PosController::class, 'autosettleKpi'], [AuthMiddleware::class, TenantMiddleware::class, new PermissionMiddleware('pos.report.read')]);
 $router->add('GET', '/pos/config', [PosController::class, 'config'], [AuthMiddleware::class, TenantMiddleware::class, new PermissionMiddleware('pos.cash.manage')]);
 $router->add('POST', '/pos/config', [PosController::class, 'updateConfig'], [AuthMiddleware::class, TenantMiddleware::class, new PermissionMiddleware('pos.cash.manage')]);
 $router->add('POST', '/pos/products', [PosController::class, 'createProduct'], [AuthMiddleware::class, TenantMiddleware::class, new PermissionMiddleware('pos.product.manage')]);

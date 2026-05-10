@@ -9,6 +9,11 @@ export async function getPosSummary() {
   return payload(data);
 }
 
+export async function getPosAutosettleKpi(params = {}) {
+  const { data } = await api.get('/pos/member-account/autosettle-kpi', { params });
+  return payload(data);
+}
+
 export async function listPosSales(params = {}) {
   const { data } = await api.get('/pos/sales', { params });
   return payload(data);
