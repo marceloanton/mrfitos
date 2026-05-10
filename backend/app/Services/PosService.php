@@ -820,6 +820,56 @@ final class PosService
         ];
     }
 
+    public function listPosAudit(
+        int $tenantId,
+        int $gymId,
+        mixed $dateFromInput,
+        mixed $dateToInput,
+        mixed $actionInput,
+        mixed $userIdInput,
+        int $page,
+        int $perPage
+    ): array {
+        $filters = $this->resolvePosAuditFilters($dateFromInput, $dateToInput, $actionInput, $userIdInput);
+        $rows = $this->repo->listPosAudit(
+            $tenantId,
+            $gymId,
+            $filters['date_from'],
+            $filters['date_to'],
+            $filters['action'],
+            $filters['user_id'],
+            $page,
+            $perPage
+        );
+
+        $rows['items'] = array_map([$this, 'normalizeAuditItem'], $rows['items'] ?? []);
+        return $rows;
+    }
+
+    public function exportPosAudit(
+        int $tenantId,
+        int $gymId,
+        mixed $dateFromInput,
+        mixed $dateToInput,
+        mixed $actionInput,
+        mixed $userIdInput
+    ): array {
+        $filters = $this->resolvePosAuditFilters($dateFromInput, $dateToInput, $actionInput, $userIdInput);
+        $rows = $this->repo->exportPosAudit(
+            $tenantId,
+            $gymId,
+            $filters['date_from'],
+            $filters['date_to'],
+            $filters['action'],
+            $filters['user_id']
+        );
+
+        return [
+            'filters' => $filters,
+            'items' => array_map([$this, 'normalizeAuditItem'], $rows),
+        ];
+    }
+
     private function getRequireOpenCash(int $tenantId, int $gymId): bool
     {
         $stored = $this->repo->getSetting($tenantId, $gymId, self::SETTING_REQUIRE_OPEN_CASH);
@@ -927,5 +977,59 @@ final class PosService
             throw new \InvalidArgumentException('user_id must be greater than 0');
         }
         return $userId;
+    }
+
+    private function resolvePosAuditFilters(
+        mixed $dateFromInput,
+        mixed $dateToInput,
+        mixed $actionInput,
+        mixed $userIdInput
+    ): array {
+        $dateFrom = $this->resolveOptionalDate($dateFromInput, 'date_from');
+        $dateTo = $this->resolveOptionalDate($dateToInput, 'date_to');
+        if ($dateFrom !== null && $dateTo !== null && $dateFrom > $dateTo) {
+            throw new \InvalidArgumentException('date_from must be <= date_to');
+        }
+
+        $action = trim((string) ($actionInput ?? ''));
+        if ($action !== '' && mb_strlen($action) > 80) {
+            throw new \InvalidArgumentException('action must be <= 80 chars');
+        }
+
+        return [
+            'date_from' => $dateFrom,
+            'date_to' => $dateTo,
+            'action' => $action !== '' ? $action : null,
+            'user_id' => $this->resolveOptionalUserId($userIdInput),
+        ];
+    }
+
+    private function normalizeAuditItem(array $row): array
+    {
+        $metadataRaw = $row['metadata'] ?? null;
+        $metadata = null;
+        if (is_string($metadataRaw) && $metadataRaw !== '') {
+            $decoded = json_decode($metadataRaw, true);
+            if (is_array($decoded)) {
+                $metadata = $decoded;
+            }
+        }
+
+        return [
+            'id' => (int) ($row['id'] ?? 0),
+            'user_id' => isset($row['user_id']) ? (int) $row['user_id'] : null,
+            'user' => [
+                'email' => $row['user_email'] ?? null,
+                'first_name' => $row['first_name'] ?? null,
+                'last_name' => $row['last_name'] ?? null,
+            ],
+            'entity_type' => (string) ($row['entity_type'] ?? ''),
+            'entity_id' => isset($row['entity_id']) ? (int) $row['entity_id'] : null,
+            'action' => (string) ($row['action'] ?? ''),
+            'metadata' => $metadata,
+            'ip_address' => $row['ip_address'] ?? null,
+            'user_agent' => $row['user_agent'] ?? null,
+            'created_at' => (string) ($row['created_at'] ?? ''),
+        ];
     }
 }

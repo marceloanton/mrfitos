@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { adjustStock, closeCashSession, createPosProduct, createPosSale, exportPosZCloseCsv, getCashByOperatorReport, getCashSessionReport, getOpenCashSessionSummary, getPosConfig, getPosSaleReceipt, getPosSaleReceiptByNumber, getPosSummary, getPosZCloseReport, listCashSessions, listLowStockProducts, listMemberAccountCharges, listPosProducts, listPosSales, listStockMovements, openCashSession, settleMemberAccountCharge, updatePosConfig, voidPosSale } from '../services/posService';
+import { adjustStock, closeCashSession, createPosProduct, createPosSale, exportPosAuditCsv, exportPosZCloseCsv, getCashByOperatorReport, getCashSessionReport, getOpenCashSessionSummary, getPosConfig, getPosSaleReceipt, getPosSaleReceiptByNumber, getPosSummary, getPosZCloseReport, listCashSessions, listLowStockProducts, listMemberAccountCharges, listPosAudit, listPosProducts, listPosSales, listStockMovements, openCashSession, settleMemberAccountCharge, updatePosConfig, voidPosSale } from '../services/posService';
 import { useAuthStore } from '../stores/authStore';
 
 export default function PosPage() {
@@ -40,6 +40,13 @@ export default function PosPage() {
   const [lowStockItems, setLowStockItems] = useState([]);
   const [cashOperatorUserId, setCashOperatorUserId] = useState('');
   const [cashByOperator, setCashByOperator] = useState({ summary: null, operators: [] });
+  const [auditRows, setAuditRows] = useState([]);
+  const [auditFilters, setAuditFilters] = useState({
+    date_from: '',
+    date_to: '',
+    action: '',
+    user_id: ''
+  });
   const [summary, setSummary] = useState({
     today_sales_count: 0,
     today_sales_total: 0,
@@ -49,7 +56,7 @@ export default function PosPage() {
 
   const load = async () => {
     try {
-      const [salesData, chargesData, productsData, movementsData, openCashData, cashSessionsData, posConfig, summaryData, lowStockData, cashByOperatorData] = await Promise.all([
+      const [salesData, chargesData, productsData, movementsData, openCashData, cashSessionsData, posConfig, summaryData, lowStockData, cashByOperatorData, auditData] = await Promise.all([
         listPosSales({ page: 1, per_page: 20 }),
         listMemberAccountCharges({ status: 'pending_auto_debit', page: 1, per_page: 20 }),
         listPosProducts(),
@@ -59,7 +66,15 @@ export default function PosPage() {
         getPosConfig(),
         getPosSummary(),
         listLowStockProducts({ threshold: Number(lowStockThreshold || 5) }),
-        getCashByOperatorReport({ user_id: cashOperatorUserId ? Number(cashOperatorUserId) : undefined })
+        getCashByOperatorReport({ user_id: cashOperatorUserId ? Number(cashOperatorUserId) : undefined }),
+        listPosAudit({
+          page: 1,
+          per_page: 20,
+          date_from: auditFilters.date_from || undefined,
+          date_to: auditFilters.date_to || undefined,
+          action: auditFilters.action || undefined,
+          user_id: auditFilters.user_id ? Number(auditFilters.user_id) : undefined
+        })
       ]);
       setSales(Array.isArray(salesData?.items) ? salesData.items : []);
       setCharges(Array.isArray(chargesData?.items) ? chargesData.items : []);
@@ -79,6 +94,7 @@ export default function PosPage() {
         summary: cashByOperatorData?.summary ?? null,
         operators: Array.isArray(cashByOperatorData?.operators) ? cashByOperatorData.operators : []
       });
+      setAuditRows(Array.isArray(auditData?.items) ? auditData.items : []);
     } catch {
       // no-op
     }
@@ -375,6 +391,28 @@ ${sale.notes ? `Nota: ${sale.notes}` : ''}
       setLowStockItems(Array.isArray(data?.items) ? data.items : []);
     } catch (err) {
       setError(err?.response?.data?.message ?? 'No se pudo cargar stock bajo.');
+    }
+  };
+
+  const onExportAuditCsv = async () => {
+    setError('');
+    try {
+      const blob = await exportPosAuditCsv({
+        date_from: auditFilters.date_from || undefined,
+        date_to: auditFilters.date_to || undefined,
+        action: auditFilters.action || undefined,
+        user_id: auditFilters.user_id ? Number(auditFilters.user_id) : undefined
+      });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `pos-audit-${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(err?.response?.data?.message ?? 'No se pudo exportar auditoría POS.');
     }
   };
 
@@ -803,6 +841,33 @@ ${sale.notes ? `Nota: ${sale.notes}` : ''}
           )) : (
             <p className="text-sm text-slate-500">Sin datos por operador.</p>
           )}
+        </div>
+      </div>
+
+      <div className="rounded-xl bg-white p-4 shadow-sm">
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+          <h3 className="text-lg font-semibold text-slate-900">Auditoría POS</h3>
+          <button className="rounded border border-slate-300 px-2 py-1 text-sm disabled:opacity-50" disabled={!canReportExport} onClick={onExportAuditCsv}>
+            Exportar CSV Auditoría
+          </button>
+        </div>
+        <div className="mb-3 grid gap-2 md:grid-cols-5">
+          <input className="rounded border border-slate-300 p-2 text-sm" type="date" value={auditFilters.date_from} onChange={(e) => setAuditFilters((s) => ({ ...s, date_from: e.target.value }))} />
+          <input className="rounded border border-slate-300 p-2 text-sm" type="date" value={auditFilters.date_to} onChange={(e) => setAuditFilters((s) => ({ ...s, date_to: e.target.value }))} />
+          <input className="rounded border border-slate-300 p-2 text-sm" placeholder="action (ej: void)" value={auditFilters.action} onChange={(e) => setAuditFilters((s) => ({ ...s, action: e.target.value }))} />
+          <input className="rounded border border-slate-300 p-2 text-sm" placeholder="user_id" value={auditFilters.user_id} onChange={(e) => setAuditFilters((s) => ({ ...s, user_id: e.target.value }))} />
+          <button className="rounded border border-slate-300 p-2 text-sm disabled:opacity-50" disabled={!canReportRead} onClick={load}>
+            Filtrar auditoría
+          </button>
+        </div>
+        <div className="space-y-2">
+          {auditRows.length === 0 ? (
+            <p className="text-sm text-slate-500">Sin eventos de auditoría POS.</p>
+          ) : auditRows.map((row) => (
+            <div key={row.id} className="rounded border border-slate-200 p-2 text-sm">
+              #{row.id} · {row.created_at} · {row.entity_type} · {row.action} · user {row.user_id ?? '-'}
+            </div>
+          ))}
         </div>
       </div>
     </section>

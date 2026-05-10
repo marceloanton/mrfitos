@@ -334,6 +334,55 @@ final class PosController
         }
     }
 
+    public function audit(): void
+    {
+        $auth = json_decode($_SERVER['auth_user'] ?? '{}', true) ?: [];
+        $page = max(1, (int) Request::query('page', 1));
+        $perPage = min(100, max(1, (int) Request::query('per_page', 20)));
+        $dateFrom = Request::query('date_from', null);
+        $dateTo = Request::query('date_to', null);
+        $action = Request::query('action', null);
+        $userId = Request::query('user_id', null);
+
+        try {
+            $data = $this->service->listPosAudit(
+                (int) ($auth['tenant_id'] ?? 0),
+                (int) ($auth['gym_id'] ?? 0),
+                $dateFrom,
+                $dateTo,
+                $action,
+                $userId,
+                $page,
+                $perPage
+            );
+            Response::json(['success' => true, 'data' => $data]);
+        } catch (\InvalidArgumentException $e) {
+            Response::json(['success' => false, 'message' => $e->getMessage()], 422);
+        } catch (\Throwable $e) {
+            Response::json(['success' => false, 'message' => 'Failed to fetch POS audit logs'], 500);
+        }
+    }
+
+    public function auditExport(): void
+    {
+        $auth = json_decode($_SERVER['auth_user'] ?? '{}', true) ?: [];
+        $dateFrom = Request::query('date_from', null);
+        $dateTo = Request::query('date_to', null);
+        $action = Request::query('action', null);
+        $userId = Request::query('user_id', null);
+
+        try {
+            $tenantId = (int) ($auth['tenant_id'] ?? 0);
+            $gymId = (int) ($auth['gym_id'] ?? 0);
+            $data = $this->service->exportPosAudit($tenantId, $gymId, $dateFrom, $dateTo, $action, $userId);
+            $this->emitPosAuditCsv($tenantId, $gymId, $data);
+        } catch (\InvalidArgumentException $e) {
+            Response::json(['success' => false, 'message' => $e->getMessage()], 422);
+        } catch (\Throwable $e) {
+            Response::json(['success' => false, 'message' => 'Failed to export POS audit logs'], 500);
+        }
+    }
+
     public function config(): void
     {
         $auth = json_decode($_SERVER['auth_user'] ?? '{}', true) ?: [];
@@ -408,6 +457,71 @@ final class PosController
             'count' => $settlements['count'] ?? 0,
             'total' => $settlements['total'] ?? 0,
         ]);
+
+        fclose($out);
+        exit;
+    }
+
+    private function emitPosAuditCsv(int $tenantId, int $gymId, array $auditData): never
+    {
+        $filters = is_array($auditData['filters'] ?? null) ? $auditData['filters'] : [];
+        $items = is_array($auditData['items'] ?? null) ? $auditData['items'] : [];
+
+        $suffix = trim((string) ($filters['date_from'] ?? ''));
+        if ($suffix === '') {
+            $suffix = date('Y-m-d');
+        }
+        $filename = 'pos-audit-' . $suffix . '.csv';
+
+        http_response_code(200);
+        header('Content-Type: text/csv; charset=utf-8');
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
+        header('Cache-Control: no-store, no-cache, must-revalidate');
+
+        $out = fopen('php://output', 'wb');
+        if ($out === false) {
+            Response::json(['success' => false, 'message' => 'Unable to create CSV output'], 500);
+        }
+
+        fputcsv($out, ['section', 'field', 'value']);
+        fputcsv($out, ['metadata', 'tenant_id', (string) $tenantId]);
+        fputcsv($out, ['metadata', 'gym_id', (string) $gymId]);
+        fputcsv($out, ['filter', 'date_from', (string) ($filters['date_from'] ?? '')]);
+        fputcsv($out, ['filter', 'date_to', (string) ($filters['date_to'] ?? '')]);
+        fputcsv($out, ['filter', 'action', (string) ($filters['action'] ?? '')]);
+        fputcsv($out, ['filter', 'user_id', (string) ($filters['user_id'] ?? '')]);
+        fputcsv($out, ['', '', '']);
+
+        fputcsv($out, [
+            'audit',
+            'id',
+            'created_at',
+            'user_id',
+            'user_email',
+            'entity_type',
+            'entity_id',
+            'action',
+            'ip_address',
+            'user_agent',
+            'metadata_json'
+        ]);
+
+        foreach ($items as $item) {
+            $user = is_array($item['user'] ?? null) ? $item['user'] : [];
+            fputcsv($out, [
+                'audit',
+                (string) ($item['id'] ?? ''),
+                (string) ($item['created_at'] ?? ''),
+                (string) ($item['user_id'] ?? ''),
+                (string) ($user['email'] ?? ''),
+                (string) ($item['entity_type'] ?? ''),
+                (string) ($item['entity_id'] ?? ''),
+                (string) ($item['action'] ?? ''),
+                (string) ($item['ip_address'] ?? ''),
+                (string) ($item['user_agent'] ?? ''),
+                $this->normalizeCsvValue($item['metadata'] ?? null),
+            ]);
+        }
 
         fclose($out);
         exit;

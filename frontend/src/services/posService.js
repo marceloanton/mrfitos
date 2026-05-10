@@ -105,6 +105,19 @@ export async function getCashByOperatorReport(params = {}) {
   return payload(data);
 }
 
+export async function listPosAudit(params = {}) {
+  const { data } = await api.get('/pos/audit', { params });
+  return payload(data);
+}
+
+export async function exportPosAuditCsv(params = {}) {
+  const { data } = await api.get('/pos/audit/export', {
+    params,
+    responseType: 'blob'
+  });
+  return data;
+}
+
 export async function getCashSessionReport(id) {
   const { data } = await api.get(`/pos/cash-sessions/${id}/report`);
   return payload(data);

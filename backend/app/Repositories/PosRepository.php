@@ -6,6 +6,127 @@ use Core\Database;
 
 final class PosRepository
 {
+    public function listPosAudit(
+        int $tenantId,
+        int $gymId,
+        ?string $dateFrom,
+        ?string $dateTo,
+        ?string $action,
+        ?int $userId,
+        int $page,
+        int $perPage
+    ): array {
+        $offset = ($page - 1) * $perPage;
+        $where = $this->buildPosAuditWhere();
+        $params = [
+            'tenant_id' => $tenantId,
+            'gym_id' => $gymId,
+        ];
+
+        if ($dateFrom !== null) {
+            $where .= ' AND al.created_at >= :date_from_dt';
+            $params['date_from_dt'] = $dateFrom . ' 00:00:00';
+        }
+        if ($dateTo !== null) {
+            $where .= ' AND al.created_at <= :date_to_dt';
+            $params['date_to_dt'] = $dateTo . ' 23:59:59';
+        }
+        if ($action !== null && $action !== '') {
+            $where .= ' AND al.action = :action';
+            $params['action'] = $action;
+        }
+        if ($userId !== null && $userId > 0) {
+            $where .= ' AND al.user_id = :user_id';
+            $params['user_id'] = $userId;
+        }
+
+        $countStmt = Database::connection()->prepare(
+            "SELECT COUNT(*) FROM activity_logs al WHERE {$where}"
+        );
+        $countStmt->execute($params);
+        $total = (int) $countStmt->fetchColumn();
+
+        $stmt = Database::connection()->prepare(
+            "SELECT al.id, al.tenant_id, al.gym_id, al.user_id, al.entity_type, al.entity_id, al.action,
+                    al.metadata, al.ip_address, al.user_agent, al.created_at,
+                    u.email AS user_email, u.first_name, u.last_name
+             FROM activity_logs al
+             LEFT JOIN users u ON u.id = al.user_id
+             WHERE {$where}
+             ORDER BY al.id DESC
+             LIMIT :limit OFFSET :offset"
+        );
+        foreach ($params as $key => $value) {
+            $stmt->bindValue(':' . $key, $value);
+        }
+        $stmt->bindValue(':limit', $perPage, \PDO::PARAM_INT);
+        $stmt->bindValue(':offset', $offset, \PDO::PARAM_INT);
+        $stmt->execute();
+
+        return [
+            'items' => $stmt->fetchAll() ?: [],
+            'meta' => [
+                'page' => $page,
+                'per_page' => $perPage,
+                'total' => $total,
+                'total_pages' => (int) max(1, ceil($total / $perPage)),
+            ],
+        ];
+    }
+
+    public function exportPosAudit(
+        int $tenantId,
+        int $gymId,
+        ?string $dateFrom,
+        ?string $dateTo,
+        ?string $action,
+        ?int $userId
+    ): array {
+        $where = $this->buildPosAuditWhere();
+        $params = [
+            'tenant_id' => $tenantId,
+            'gym_id' => $gymId,
+        ];
+
+        if ($dateFrom !== null) {
+            $where .= ' AND al.created_at >= :date_from_dt';
+            $params['date_from_dt'] = $dateFrom . ' 00:00:00';
+        }
+        if ($dateTo !== null) {
+            $where .= ' AND al.created_at <= :date_to_dt';
+            $params['date_to_dt'] = $dateTo . ' 23:59:59';
+        }
+        if ($action !== null && $action !== '') {
+            $where .= ' AND al.action = :action';
+            $params['action'] = $action;
+        }
+        if ($userId !== null && $userId > 0) {
+            $where .= ' AND al.user_id = :user_id';
+            $params['user_id'] = $userId;
+        }
+
+        $stmt = Database::connection()->prepare(
+            "SELECT al.id, al.user_id, al.entity_type, al.entity_id, al.action, al.metadata, al.ip_address, al.user_agent, al.created_at,
+                    u.email AS user_email, u.first_name, u.last_name
+             FROM activity_logs al
+             LEFT JOIN users u ON u.id = al.user_id
+             WHERE {$where}
+             ORDER BY al.id DESC"
+        );
+        $stmt->execute($params);
+        return $stmt->fetchAll() ?: [];
+    }
+
+    private function buildPosAuditWhere(): string
+    {
+        return 'al.tenant_id = :tenant_id
+                AND al.gym_id = :gym_id
+                AND (
+                    al.entity_type IN ("pos_sale", "pos_cash_session", "pos_stock", "pos_config")
+                    OR al.action LIKE "pos\_%"
+                )';
+    }
+
     public function findSaleByIdAnyStatus(int $tenantId, int $gymId, int $saleId): ?array
     {
         $stmt = Database::connection()->prepare(
