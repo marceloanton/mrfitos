@@ -566,10 +566,13 @@ final class PosService
             throw new \InvalidArgumentException('date_from must be <= date_to');
         }
 
+        $rules = $this->resolveCollectorCommissionRules();
         $rows = $this->repo->getMemberAccountCollectorRanking($tenantId, $gymId, $dateFrom, $dateTo);
-        $items = array_map(static function (array $row): array {
+        $items = array_map(function (array $row) use ($rules): array {
             $contacts = (int) ($row['contacts_count'] ?? 0);
             $responses = (int) ($row['responses_count'] ?? 0);
+            $recoveredAmount = (float) ($row['recovered_amount'] ?? 0);
+            $commissionRate = $this->resolveCollectorCommissionRate($recoveredAmount, $rules);
             return [
                 'user_id' => (int) ($row['user_id'] ?? 0),
                 'user_email' => (string) ($row['user_email'] ?? ''),
@@ -578,13 +581,16 @@ final class PosService
                 'responses_count' => $responses,
                 'response_rate' => $contacts > 0 ? round(($responses / $contacts) * 100, 2) : 0.0,
                 'settlements_count' => (int) ($row['settlements_count'] ?? 0),
-                'recovered_amount' => (float) ($row['recovered_amount'] ?? 0),
+                'recovered_amount' => $recoveredAmount,
+                'commission_rate' => $commissionRate,
+                'commission_amount' => round($recoveredAmount * ($commissionRate / 100), 2),
             ];
         }, $rows);
 
         return [
             'date_from' => $dateFrom,
             'date_to' => $dateTo,
+            'commission_rules' => $rules,
             'items' => $items,
         ];
     }
@@ -2374,5 +2380,39 @@ final class PosService
             throw new \InvalidArgumentException('cooldown_minutes must be between 1 and 1440');
         }
         return $minutes;
+    }
+
+    private function resolveCollectorCommissionRules(): array
+    {
+        $tier1Max = (float) Env::get('COLLECTOR_COMMISSION_TIER1_MAX', '100000');
+        $tier2Max = (float) Env::get('COLLECTOR_COMMISSION_TIER2_MAX', '300000');
+        $tier1Rate = (float) Env::get('COLLECTOR_COMMISSION_TIER1_RATE', '1.5');
+        $tier2Rate = (float) Env::get('COLLECTOR_COMMISSION_TIER2_RATE', '2.0');
+        $tier3Rate = (float) Env::get('COLLECTOR_COMMISSION_TIER3_RATE', '3.0');
+
+        if ($tier1Max <= 0) $tier1Max = 100000;
+        if ($tier2Max <= $tier1Max) $tier2Max = 300000;
+        if ($tier1Rate < 0) $tier1Rate = 1.5;
+        if ($tier2Rate < 0) $tier2Rate = 2.0;
+        if ($tier3Rate < 0) $tier3Rate = 3.0;
+
+        return [
+            'tier1_max' => $tier1Max,
+            'tier2_max' => $tier2Max,
+            'tier1_rate' => $tier1Rate,
+            'tier2_rate' => $tier2Rate,
+            'tier3_rate' => $tier3Rate,
+        ];
+    }
+
+    private function resolveCollectorCommissionRate(float $recoveredAmount, array $rules): float
+    {
+        if ($recoveredAmount <= (float) ($rules['tier1_max'] ?? 100000)) {
+            return (float) ($rules['tier1_rate'] ?? 1.5);
+        }
+        if ($recoveredAmount <= (float) ($rules['tier2_max'] ?? 300000)) {
+            return (float) ($rules['tier2_rate'] ?? 2.0);
+        }
+        return (float) ($rules['tier3_rate'] ?? 3.0);
     }
 }

@@ -116,6 +116,7 @@ export default function PosPage() {
     items: []
   });
   const [collectorRanking, setCollectorRanking] = useState([]);
+  const [collectorCommissionRules, setCollectorCommissionRules] = useState(null);
   const [summary, setSummary] = useState({
     today_sales_count: 0,
     today_sales_total: 0,
@@ -246,6 +247,7 @@ export default function PosPage() {
         promise_confirmation_rate: Number(contactEffectivenessData?.promise_confirmation_rate ?? 0)
       });
       setCollectorRanking(Array.isArray(collectorRankingData?.items) ? collectorRankingData.items : []);
+      setCollectorCommissionRules(collectorRankingData?.commission_rules ?? null);
     } catch {
       // no-op
     }
@@ -943,12 +945,17 @@ ${sale.notes ? `Nota: ${sale.notes}` : ''}
         </div>
         <div className="mb-3 rounded border border-slate-200 p-2">
           <p className="mb-2 text-sm font-medium text-slate-700">Ranking de cobradores</p>
+          {collectorCommissionRules && (
+            <p className="mb-2 text-xs text-slate-500">
+              Regla comisión: hasta ${Number(collectorCommissionRules.tier1_max || 0).toFixed(0)} {"=>"} {Number(collectorCommissionRules.tier1_rate || 0).toFixed(2)}%, hasta ${Number(collectorCommissionRules.tier2_max || 0).toFixed(0)} {"=>"} {Number(collectorCommissionRules.tier2_rate || 0).toFixed(2)}%, mayor {"=>"} {Number(collectorCommissionRules.tier3_rate || 0).toFixed(2)}%.
+            </p>
+          )}
           {collectorRanking.length === 0 ? (
             <p className="text-sm text-slate-500">Sin actividad en el rango.</p>
           ) : collectorRanking.map((r) => (
             <div key={r.user_id} className="flex items-center justify-between border-t border-slate-100 py-1 text-sm first:border-t-0">
               <span>{r.user_name || r.user_email || `user#${r.user_id}`}</span>
-              <span className="font-semibold">${Number(r.recovered_amount || 0).toFixed(2)} · resp {Number(r.response_rate || 0).toFixed(2)}%</span>
+              <span className="font-semibold">${Number(r.recovered_amount || 0).toFixed(2)} · com. ${Number(r.commission_amount || 0).toFixed(2)} ({Number(r.commission_rate || 0).toFixed(2)}%) · resp {Number(r.response_rate || 0).toFixed(2)}%</span>
             </div>
           ))}
         </div>
