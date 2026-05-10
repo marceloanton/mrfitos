@@ -136,6 +136,10 @@ $router->add('GET', '/pos/reports/z-close/export', [PosController::class, 'zClos
 $router->add('GET', '/pos/reports/cash-by-operator', [PosController::class, 'cashByOperatorReport'], [AuthMiddleware::class, TenantMiddleware::class, new PermissionMiddleware('pos.report.read')]);
 $router->add('GET', '/pos/alerts', [PosController::class, 'alerts'], [AuthMiddleware::class, TenantMiddleware::class, new PermissionMiddleware('pos.report.read')]);
 $router->add('GET', '/pos/alerts/notify-link', [PosController::class, 'alertsNotifyLink'], [AuthMiddleware::class, TenantMiddleware::class, new PermissionMiddleware('pos.report.read'), new PermissionMiddleware('whatsapp.send')]);
+$router->add('GET', '/pos/alerts/contacts', [PosController::class, 'alertContacts'], [AuthMiddleware::class, TenantMiddleware::class, new PermissionMiddleware('pos.report.read')]);
+$router->add('POST', '/pos/alerts/contacts', [PosController::class, 'createAlertContact'], [AuthMiddleware::class, TenantMiddleware::class, new PermissionMiddleware('pos.cash.manage')]);
+$router->add('PATCH', '/pos/alerts/contacts/{id}', [PosController::class, 'updateAlertContact'], [AuthMiddleware::class, TenantMiddleware::class, new PermissionMiddleware('pos.cash.manage')]);
+$router->add('DELETE', '/pos/alerts/contacts/{id}', [PosController::class, 'deleteAlertContact'], [AuthMiddleware::class, TenantMiddleware::class, new PermissionMiddleware('pos.cash.manage')]);
 $router->add('GET', '/pos/audit', [PosController::class, 'audit'], [AuthMiddleware::class, TenantMiddleware::class, new PermissionMiddleware('pos.report.read')]);
 $router->add('GET', '/pos/audit/export', [PosController::class, 'auditExport'], [AuthMiddleware::class, TenantMiddleware::class, new PermissionMiddleware('pos.report.export')]);
 

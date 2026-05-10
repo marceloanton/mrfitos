@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { adjustStock, closeCashSession, createPosProduct, createPosSale, exportPosAuditCsv, exportPosZCloseCsv, getCashByOperatorReport, getCashSessionReport, getOpenCashSessionSummary, getPosAlertNotifyLink, getPosAlerts, getPosConfig, getPosSaleReceipt, getPosSaleReceiptByNumber, getPosSummary, getPosZCloseReport, listCashSessions, listLowStockProducts, listMemberAccountCharges, listPosAudit, listPosProducts, listPosSales, listStockMovements, openCashSession, settleMemberAccountCharge, updatePosConfig, voidPosSale } from '../services/posService';
+import { adjustStock, closeCashSession, createPosAlertContact, createPosProduct, createPosSale, deletePosAlertContact, exportPosAuditCsv, exportPosZCloseCsv, getCashByOperatorReport, getCashSessionReport, getOpenCashSessionSummary, getPosAlertNotifyLink, getPosAlerts, getPosConfig, getPosSaleReceipt, getPosSaleReceiptByNumber, getPosSummary, getPosZCloseReport, listCashSessions, listLowStockProducts, listMemberAccountCharges, listPosAlertContacts, listPosAudit, listPosProducts, listPosSales, listStockMovements, openCashSession, settleMemberAccountCharge, updatePosAlertContact, updatePosConfig, voidPosSale } from '../services/posService';
 import { useAuthStore } from '../stores/authStore';
 
 export default function PosPage() {
@@ -55,6 +55,9 @@ export default function PosPage() {
   });
   const [posAlerts, setPosAlerts] = useState({ summary: null, high_cash_differences: [], unusual_voids_by_operator: [] });
   const [alertNotifyInfo, setAlertNotifyInfo] = useState(null);
+  const [alertContacts, setAlertContacts] = useState([]);
+  const [selectedAlertContactId, setSelectedAlertContactId] = useState('');
+  const [newAlertContact, setNewAlertContact] = useState({ label: '', phone: '' });
   const [summary, setSummary] = useState({
     today_sales_count: 0,
     today_sales_total: 0,
@@ -64,7 +67,7 @@ export default function PosPage() {
 
   const load = async () => {
     try {
-      const [salesData, chargesData, productsData, movementsData, openCashData, cashSessionsData, posConfig, summaryData, lowStockData, cashByOperatorData, auditData, alertsData] = await Promise.all([
+      const [salesData, chargesData, productsData, movementsData, openCashData, cashSessionsData, posConfig, summaryData, lowStockData, cashByOperatorData, auditData, alertsData, contactsData] = await Promise.all([
         listPosSales({ page: 1, per_page: 20 }),
         listMemberAccountCharges({ status: 'pending_auto_debit', page: 1, per_page: 20 }),
         listPosProducts(),
@@ -88,7 +91,8 @@ export default function PosPage() {
           date_to: alertFilters.date_to || undefined,
           difference_threshold: Number(alertFilters.difference_threshold || 0),
           voids_threshold: Number(alertFilters.voids_threshold || 3)
-        })
+        }),
+        listPosAlertContacts()
       ]);
       setSales(Array.isArray(salesData?.items) ? salesData.items : []);
       setCharges(Array.isArray(chargesData?.items) ? chargesData.items : []);
@@ -114,6 +118,7 @@ export default function PosPage() {
         high_cash_differences: Array.isArray(alertsData?.high_cash_differences) ? alertsData.high_cash_differences : [],
         unusual_voids_by_operator: Array.isArray(alertsData?.unusual_voids_by_operator) ? alertsData.unusual_voids_by_operator : []
       });
+      setAlertContacts(Array.isArray(contactsData?.items) ? contactsData.items : []);
     } catch {
       // no-op
     }
@@ -442,7 +447,8 @@ ${sale.notes ? `Nota: ${sale.notes}` : ''}
         date_from: alertFilters.date_from || undefined,
         date_to: alertFilters.date_to || undefined,
         difference_threshold: Number(alertFilters.difference_threshold || 0),
-        voids_threshold: Number(alertFilters.voids_threshold || 3)
+        voids_threshold: Number(alertFilters.voids_threshold || 3),
+        contact_id: selectedAlertContactId ? Number(selectedAlertContactId) : undefined
       });
       setAlertNotifyInfo(data);
       if (data?.whatsapp_link) {
@@ -450,6 +456,38 @@ ${sale.notes ? `Nota: ${sale.notes}` : ''}
       }
     } catch (err) {
       setError(err?.response?.data?.message ?? 'No se pudo generar notificación WhatsApp.');
+    }
+  };
+
+  const onCreateAlertContact = async () => {
+    setError('');
+    try {
+      await createPosAlertContact({ label: newAlertContact.label, phone: newAlertContact.phone, is_active: true });
+      setNewAlertContact({ label: '', phone: '' });
+      await load();
+    } catch (err) {
+      setError(err?.response?.data?.message ?? 'No se pudo crear contacto de alerta.');
+    }
+  };
+
+  const onToggleAlertContact = async (contact) => {
+    setError('');
+    try {
+      await updatePosAlertContact(contact.id, { is_active: !contact.is_active });
+      await load();
+    } catch (err) {
+      setError(err?.response?.data?.message ?? 'No se pudo actualizar contacto.');
+    }
+  };
+
+  const onDeleteAlertContact = async (contactId) => {
+    setError('');
+    try {
+      await deletePosAlertContact(contactId);
+      if (String(selectedAlertContactId) === String(contactId)) setSelectedAlertContactId('');
+      await load();
+    } catch (err) {
+      setError(err?.response?.data?.message ?? 'No se pudo eliminar contacto.');
     }
   };
 
@@ -892,6 +930,34 @@ ${sale.notes ? `Nota: ${sale.notes}` : ''}
               Notificar WhatsApp
             </button>
           </div>
+        </div>
+        <div className="mb-3 grid gap-2 md:grid-cols-4">
+          <input className="rounded border border-slate-300 p-2 text-sm" placeholder="Etiqueta contacto" value={newAlertContact.label} onChange={(e) => setNewAlertContact((s) => ({ ...s, label: e.target.value }))} />
+          <input className="rounded border border-slate-300 p-2 text-sm" placeholder="Telefono (+549...)" value={newAlertContact.phone} onChange={(e) => setNewAlertContact((s) => ({ ...s, phone: e.target.value }))} />
+          <button className="rounded border border-slate-300 p-2 text-sm disabled:opacity-50" disabled={!canCashManage} onClick={onCreateAlertContact}>
+            Agregar contacto
+          </button>
+          <select className="rounded border border-slate-300 p-2 text-sm" value={selectedAlertContactId} onChange={(e) => setSelectedAlertContactId(e.target.value)}>
+            <option value="">Destino default (gym.phone)</option>
+            {alertContacts.filter((c) => c.is_active).map((c) => (
+              <option key={c.id} value={c.id}>{c.label} · {c.phone}</option>
+            ))}
+          </select>
+        </div>
+        <div className="mb-3 space-y-2">
+          {alertContacts.map((c) => (
+            <div key={c.id} className="flex items-center justify-between rounded border border-slate-200 p-2 text-xs">
+              <span>{c.label} · {c.phone} · {c.is_active ? 'activo' : 'inactivo'}</span>
+              <div className="flex gap-2">
+                <button className="rounded border border-slate-300 px-2 py-1 disabled:opacity-50" disabled={!canCashManage} onClick={() => onToggleAlertContact(c)}>
+                  {c.is_active ? 'Desactivar' : 'Activar'}
+                </button>
+                <button className="rounded border border-rose-300 px-2 py-1 text-rose-700 disabled:opacity-50" disabled={!canCashManage} onClick={() => onDeleteAlertContact(c.id)}>
+                  Eliminar
+                </button>
+              </div>
+            </div>
+          ))}
         </div>
         {alertNotifyInfo && !alertNotifyInfo.whatsapp_link && (
           <p className="mb-2 rounded border border-slate-300 bg-slate-50 p-2 text-xs text-slate-700">

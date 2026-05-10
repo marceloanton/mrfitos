@@ -350,6 +350,7 @@ final class PosController
         $differenceThreshold = Request::query('difference_threshold', null);
         $voidsThreshold = Request::query('voids_threshold', null);
         $phone = Request::query('phone', null);
+        $contactId = Request::query('contact_id', null);
         try {
             $data = $this->service->getOperationalAlertsNotifyLink(
                 (int) ($auth['tenant_id'] ?? 0),
@@ -358,13 +359,79 @@ final class PosController
                 $dateTo,
                 $differenceThreshold,
                 $voidsThreshold,
-                $phone
+                $phone,
+                $contactId
             );
             Response::json(['success' => true, 'data' => $data]);
         } catch (\InvalidArgumentException $e) {
             Response::json(['success' => false, 'message' => $e->getMessage()], 422);
         } catch (\Throwable $e) {
             Response::json(['success' => false, 'message' => 'Failed to build POS alert WhatsApp link'], 500);
+        }
+    }
+
+    public function alertContacts(): void
+    {
+        $auth = json_decode($_SERVER['auth_user'] ?? '{}', true) ?: [];
+        Response::json([
+            'success' => true,
+            'data' => [
+                'items' => $this->service->listAlertContacts((int) ($auth['tenant_id'] ?? 0), (int) ($auth['gym_id'] ?? 0))
+            ]
+        ]);
+    }
+
+    public function createAlertContact(): void
+    {
+        $auth = json_decode($_SERVER['auth_user'] ?? '{}', true) ?: [];
+        try {
+            $data = $this->service->createAlertContact(
+                (int) ($auth['tenant_id'] ?? 0),
+                (int) ($auth['gym_id'] ?? 0),
+                Request::json()
+            );
+            Response::json(['success' => true, 'data' => $data], 201);
+        } catch (\InvalidArgumentException $e) {
+            Response::json(['success' => false, 'message' => $e->getMessage()], 422);
+        } catch (\Throwable $e) {
+            Response::json(['success' => false, 'message' => 'Failed to create POS alert contact'], 500);
+        }
+    }
+
+    public function updateAlertContact(): void
+    {
+        $auth = json_decode($_SERVER['auth_user'] ?? '{}', true) ?: [];
+        $contactId = (int) Request::param('id', 0);
+        try {
+            $data = $this->service->updateAlertContact(
+                (int) ($auth['tenant_id'] ?? 0),
+                (int) ($auth['gym_id'] ?? 0),
+                $contactId,
+                Request::json()
+            );
+            Response::json(['success' => true, 'data' => $data]);
+        } catch (\InvalidArgumentException $e) {
+            Response::json(['success' => false, 'message' => $e->getMessage()], 422);
+        } catch (\Throwable $e) {
+            Response::json(['success' => false, 'message' => 'Failed to update POS alert contact'], 500);
+        }
+    }
+
+    public function deleteAlertContact(): void
+    {
+        $auth = json_decode($_SERVER['auth_user'] ?? '{}', true) ?: [];
+        $contactId = (int) Request::param('id', 0);
+        try {
+            $data = $this->service->deleteAlertContact(
+                (int) ($auth['tenant_id'] ?? 0),
+                (int) ($auth['gym_id'] ?? 0),
+                $contactId
+            );
+            Response::json(['success' => true, 'data' => $data]);
+        } catch (\InvalidArgumentException $e) {
+            Response::json(['success' => false, 'message' => $e->getMessage()], 422);
+        } catch (\Throwable $e) {
+            Response::json(['success' => false, 'message' => 'Failed to delete POS alert contact'], 500);
         }
     }
 

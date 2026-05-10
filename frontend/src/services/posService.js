@@ -128,6 +128,26 @@ export async function getPosAlertNotifyLink(params = {}) {
   return payload(data);
 }
 
+export async function listPosAlertContacts() {
+  const { data } = await api.get('/pos/alerts/contacts');
+  return payload(data);
+}
+
+export async function createPosAlertContact(body = {}) {
+  const { data } = await api.post('/pos/alerts/contacts', body);
+  return payload(data);
+}
+
+export async function updatePosAlertContact(id, body = {}) {
+  const { data } = await api.patch(`/pos/alerts/contacts/${id}`, body);
+  return payload(data);
+}
+
+export async function deletePosAlertContact(id) {
+  const { data } = await api.delete(`/pos/alerts/contacts/${id}`);
+  return payload(data);
+}
+
 export async function getCashSessionReport(id) {
   const { data } = await api.get(`/pos/cash-sessions/${id}/report`);
   return payload(data);

@@ -762,7 +762,8 @@ final class PosService
         mixed $dateToInput,
         mixed $differenceThresholdInput,
         mixed $voidsThresholdInput,
-        mixed $phoneInput
+        mixed $phoneInput,
+        mixed $contactIdInput
     ): array {
         $alerts = $this->getOperationalAlerts(
             $tenantId,
@@ -780,9 +781,28 @@ final class PosService
         $voidOpsCount = (int) ($summary['unusual_void_operators_count'] ?? 0);
 
         $rawPhone = trim((string) ($phoneInput ?? ''));
-        if ($rawPhone === '') {
-            $gymPhone = $this->repo->findGymPhone($tenantId, $gymId);
-            $rawPhone = trim((string) ($gymPhone ?? ''));
+        $targetSource = 'none';
+        $targetLabel = null;
+
+        if ($rawPhone !== '') {
+            $targetSource = 'query_phone';
+        } else {
+            $contactId = $this->resolveOptionalUserId($contactIdInput);
+            if ($contactId !== null) {
+                $contact = $this->repo->findAlertContactById($tenantId, $gymId, $contactId);
+                if ($contact && (int) ($contact['is_active'] ?? 0) === 1) {
+                    $rawPhone = trim((string) ($contact['phone'] ?? ''));
+                    $targetSource = 'contact';
+                    $targetLabel = (string) ($contact['label'] ?? '');
+                }
+            }
+            if ($rawPhone === '') {
+                $gymPhone = $this->repo->findGymPhone($tenantId, $gymId);
+                $rawPhone = trim((string) ($gymPhone ?? ''));
+                if ($rawPhone !== '') {
+                    $targetSource = 'gym_phone';
+                }
+            }
         }
 
         $normalizedPhone = $this->normalizePhoneDigits($rawPhone);
@@ -792,6 +812,8 @@ final class PosService
                 'message' => $baseMessage . '. No hay teléfono válido configurado para WhatsApp.',
                 'phone_normalized' => null,
                 'whatsapp_link' => null,
+                'target_source' => 'none',
+                'target_label' => null,
             ];
         }
 
@@ -808,6 +830,108 @@ final class PosService
             'message' => $baseMessage,
             'phone_normalized' => $normalizedPhone,
             'whatsapp_link' => 'https://wa.me/' . $normalizedPhone . '?text=' . rawurlencode($text),
+            'target_source' => $targetSource,
+            'target_label' => $targetLabel,
+        ];
+    }
+
+    public function listAlertContacts(int $tenantId, int $gymId): array
+    {
+        $rows = $this->repo->listAlertContacts($tenantId, $gymId);
+        return array_map([$this, 'normalizeAlertContact'], $rows);
+    }
+
+    public function createAlertContact(int $tenantId, int $gymId, array $input): array
+    {
+        $label = trim((string) ($input['label'] ?? ''));
+        if (mb_strlen($label) < 2) {
+            throw new \InvalidArgumentException('label is required (min 2 chars)');
+        }
+
+        if (!array_key_exists('phone', $input)) {
+            throw new \InvalidArgumentException('phone is required');
+        }
+        $phone = $this->normalizePhoneDigits((string) ($input['phone'] ?? ''));
+        if ($phone === null) {
+            throw new \InvalidArgumentException('phone is invalid');
+        }
+
+        $id = $this->repo->createAlertContact([
+            'tenant_id' => $tenantId,
+            'gym_id' => $gymId,
+            'label' => substr($label, 0, 80),
+            'phone' => $phone,
+            'is_active' => array_key_exists('is_active', $input) ? (!empty($input['is_active']) ? 1 : 0) : 1,
+        ]);
+
+        $created = $this->repo->findAlertContactById($tenantId, $gymId, $id);
+        if (!$created) {
+            throw new \RuntimeException('Failed to create alert contact');
+        }
+        return $this->normalizeAlertContact($created);
+    }
+
+    public function updateAlertContact(int $tenantId, int $gymId, int $contactId, array $input): array
+    {
+        if ($contactId <= 0) {
+            throw new \InvalidArgumentException('Invalid contact id');
+        }
+        $existing = $this->repo->findAlertContactById($tenantId, $gymId, $contactId);
+        if (!$existing) {
+            throw new \InvalidArgumentException('Alert contact not found');
+        }
+
+        $fields = [];
+        if (array_key_exists('label', $input)) {
+            $label = trim((string) ($input['label'] ?? ''));
+            if (mb_strlen($label) < 2) {
+                throw new \InvalidArgumentException('label must have at least 2 chars');
+            }
+            $fields['label'] = substr($label, 0, 80);
+        }
+        if (array_key_exists('phone', $input)) {
+            $phone = $this->normalizePhoneDigits((string) ($input['phone'] ?? ''));
+            if ($phone === null) {
+                throw new \InvalidArgumentException('phone is invalid');
+            }
+            $fields['phone'] = $phone;
+        }
+        if (array_key_exists('is_active', $input)) {
+            $fields['is_active'] = !empty($input['is_active']) ? 1 : 0;
+        }
+        if ($fields === []) {
+            throw new \InvalidArgumentException('No valid fields to update');
+        }
+
+        $ok = $this->repo->updateAlertContact($tenantId, $gymId, $contactId, $fields);
+        if (!$ok) {
+            throw new \RuntimeException('Failed to update alert contact');
+        }
+        $updated = $this->repo->findAlertContactById($tenantId, $gymId, $contactId);
+        if (!$updated) {
+            throw new \RuntimeException('Alert contact not found after update');
+        }
+        return $this->normalizeAlertContact($updated);
+    }
+
+    public function deleteAlertContact(int $tenantId, int $gymId, int $contactId): array
+    {
+        if ($contactId <= 0) {
+            throw new \InvalidArgumentException('Invalid contact id');
+        }
+        $existing = $this->repo->findAlertContactById($tenantId, $gymId, $contactId);
+        if (!$existing) {
+            throw new \InvalidArgumentException('Alert contact not found');
+        }
+
+        $ok = $this->repo->softDeleteAlertContact($tenantId, $gymId, $contactId);
+        if (!$ok) {
+            throw new \RuntimeException('Failed to delete alert contact');
+        }
+
+        return [
+            'id' => $contactId,
+            'status' => 'deleted',
         ];
     }
 
@@ -1197,6 +1321,18 @@ final class PosService
             'ip_address' => $row['ip_address'] ?? null,
             'user_agent' => $row['user_agent'] ?? null,
             'created_at' => (string) ($row['created_at'] ?? ''),
+        ];
+    }
+
+    private function normalizeAlertContact(array $row): array
+    {
+        return [
+            'id' => (int) ($row['id'] ?? 0),
+            'label' => (string) ($row['label'] ?? ''),
+            'phone' => (string) ($row['phone'] ?? ''),
+            'is_active' => (int) ($row['is_active'] ?? 0) === 1,
+            'created_at' => (string) ($row['created_at'] ?? ''),
+            'updated_at' => (string) ($row['updated_at'] ?? ''),
         ];
     }
 

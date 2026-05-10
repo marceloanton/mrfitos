@@ -6,6 +6,103 @@ use Core\Database;
 
 final class PosRepository
 {
+    public function listAlertContacts(int $tenantId, int $gymId): array
+    {
+        $stmt = Database::connection()->prepare(
+            'SELECT id, label, phone, is_active, created_at, updated_at
+             FROM gym_alert_contacts
+             WHERE tenant_id = :tenant_id
+               AND gym_id = :gym_id
+               AND deleted_at IS NULL
+             ORDER BY is_active DESC, id DESC'
+        );
+        $stmt->execute([
+            'tenant_id' => $tenantId,
+            'gym_id' => $gymId,
+        ]);
+        return $stmt->fetchAll() ?: [];
+    }
+
+    public function createAlertContact(array $data): int
+    {
+        $stmt = Database::connection()->prepare(
+            'INSERT INTO gym_alert_contacts
+             (tenant_id, gym_id, label, phone, is_active, created_at, updated_at)
+             VALUES
+             (:tenant_id, :gym_id, :label, :phone, :is_active, NOW(), NOW())'
+        );
+        $stmt->execute($data);
+        return (int) Database::connection()->lastInsertId();
+    }
+
+    public function findAlertContactById(int $tenantId, int $gymId, int $contactId): ?array
+    {
+        $stmt = Database::connection()->prepare(
+            'SELECT id, tenant_id, gym_id, label, phone, is_active, created_at, updated_at
+             FROM gym_alert_contacts
+             WHERE id = :id
+               AND tenant_id = :tenant_id
+               AND gym_id = :gym_id
+               AND deleted_at IS NULL
+             LIMIT 1'
+        );
+        $stmt->execute([
+            'id' => $contactId,
+            'tenant_id' => $tenantId,
+            'gym_id' => $gymId,
+        ]);
+        $row = $stmt->fetch();
+        return $row ?: null;
+    }
+
+    public function updateAlertContact(int $tenantId, int $gymId, int $contactId, array $fields): bool
+    {
+        if ($fields === []) {
+            return false;
+        }
+
+        $sets = [];
+        $params = [
+            'id' => $contactId,
+            'tenant_id' => $tenantId,
+            'gym_id' => $gymId,
+        ];
+        foreach ($fields as $key => $value) {
+            $sets[] = $key . ' = :' . $key;
+            $params[$key] = $value;
+        }
+        $sets[] = 'updated_at = NOW()';
+
+        $sql = 'UPDATE gym_alert_contacts
+                SET ' . implode(', ', $sets) . '
+                WHERE id = :id
+                  AND tenant_id = :tenant_id
+                  AND gym_id = :gym_id
+                  AND deleted_at IS NULL';
+
+        $stmt = Database::connection()->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->rowCount() > 0;
+    }
+
+    public function softDeleteAlertContact(int $tenantId, int $gymId, int $contactId): bool
+    {
+        $stmt = Database::connection()->prepare(
+            'UPDATE gym_alert_contacts
+             SET deleted_at = NOW(), updated_at = NOW()
+             WHERE id = :id
+               AND tenant_id = :tenant_id
+               AND gym_id = :gym_id
+               AND deleted_at IS NULL'
+        );
+        $stmt->execute([
+            'id' => $contactId,
+            'tenant_id' => $tenantId,
+            'gym_id' => $gymId,
+        ]);
+        return $stmt->rowCount() > 0;
+    }
+
     public function findGymPhone(int $tenantId, int $gymId): ?string
     {
         $stmt = Database::connection()->prepare(
