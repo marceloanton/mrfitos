@@ -34,6 +34,19 @@ curl -X POST "http://localhost:8080/cron/pos/alerts/dispatch" \
   -d "{\"tenant_id\":1,\"gym_id\":1,\"cooldown_minutes\":60}"
 ```
 
+## Script PowerShell local
+
+En la raíz del repo se agregó:
+
+- `run-pos-alerts-cron.ps1`
+
+Ejemplo:
+
+```powershell
+$env:CRON_BEARER_TOKEN="TU_CRON_TOKEN"
+.\run-pos-alerts-cron.ps1 -BaseUrl "http://localhost:8080" -TenantId 1 -GymId 1 -CooldownMinutes 60
+```
+
 ## Respuesta esperada
 
 ```json
