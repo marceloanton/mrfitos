@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { adjustStock, closeCashSession, createPosAlertContact, createPosProduct, createPosSale, deletePosAlertContact, exportPosAuditCsv, exportPosZCloseCsv, getCashByOperatorReport, getCashSessionReport, getOpenCashSessionSummary, getPosAlertNotifyLink, getPosAlerts, getPosConfig, getPosSaleReceipt, getPosSaleReceiptByNumber, getPosSummary, getPosZCloseReport, listCashSessions, listLowStockProducts, listMemberAccountCharges, listPosAlertContacts, listPosAlertDispatchHistory, listPosAudit, listPosProducts, listPosSales, listStockMovements, notifyCriticalPosAlert, openCashSession, settleMemberAccountCharge, updatePosAlertContact, updatePosConfig, voidPosSale } from '../services/posService';
+import { adjustStock, closeCashSession, createPosAlertContact, createPosProduct, createPosSale, deletePosAlertContact, exportPosAlertDispatchHistoryCsv, exportPosAuditCsv, exportPosZCloseCsv, getCashByOperatorReport, getCashSessionReport, getOpenCashSessionSummary, getPosAlertNotifyLink, getPosAlerts, getPosConfig, getPosSaleReceipt, getPosSaleReceiptByNumber, getPosSummary, getPosZCloseReport, listCashSessions, listLowStockProducts, listMemberAccountCharges, listPosAlertContacts, listPosAlertDispatchHistory, listPosAudit, listPosProducts, listPosSales, listStockMovements, notifyCriticalPosAlert, openCashSession, settleMemberAccountCharge, updatePosAlertContact, updatePosConfig, voidPosSale } from '../services/posService';
 import { useAuthStore } from '../stores/authStore';
 
 export default function PosPage() {
@@ -521,6 +521,26 @@ ${sale.notes ? `Nota: ${sale.notes}` : ''}
       await load();
     } catch (err) {
       setError(err?.response?.data?.message ?? 'No se pudo eliminar contacto.');
+    }
+  };
+
+  const onExportDispatchHistoryCsv = async () => {
+    setError('');
+    try {
+      const blob = await exportPosAlertDispatchHistoryCsv({
+        date_from: dispatchHistoryFilters.date_from || undefined,
+        date_to: dispatchHistoryFilters.date_to || undefined
+      });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `pos-alert-dispatch-history-${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(err?.response?.data?.message ?? 'No se pudo exportar historial de dispatch.');
     }
   };
 
@@ -1075,9 +1095,14 @@ ${sale.notes ? `Nota: ${sale.notes}` : ''}
       <div className="rounded-xl bg-white p-4 shadow-sm">
         <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
           <h3 className="text-lg font-semibold text-slate-900">Historial Dispatch Crítico</h3>
-          <button className="rounded border border-slate-300 px-2 py-1 text-sm disabled:opacity-50" disabled={!canReportRead} onClick={load}>
-            Refrescar historial
-          </button>
+          <div className="flex gap-2">
+            <button className="rounded border border-slate-300 px-2 py-1 text-sm disabled:opacity-50" disabled={!canReportRead} onClick={load}>
+              Refrescar historial
+            </button>
+            <button className="rounded border border-slate-300 px-2 py-1 text-sm disabled:opacity-50" disabled={!canReportExport} onClick={onExportDispatchHistoryCsv}>
+              Exportar CSV
+            </button>
+          </div>
         </div>
         <div className="mb-3 grid gap-2 md:grid-cols-3">
           <input className="rounded border border-slate-300 p-2 text-sm" type="date" value={dispatchHistoryFilters.date_from} onChange={(e) => setDispatchHistoryFilters((s) => ({ ...s, date_from: e.target.value }))} />

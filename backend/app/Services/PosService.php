@@ -1251,6 +1251,26 @@ final class PosService
         return $rows;
     }
 
+    public function exportCriticalAlertDispatchHistory(
+        int $tenantId,
+        int $gymId,
+        mixed $dateFromInput,
+        mixed $dateToInput
+    ): array {
+        $filters = $this->resolveDispatchHistoryFilters($dateFromInput, $dateToInput);
+        $rows = $this->repo->exportCriticalAlertDispatchHistory(
+            $tenantId,
+            $gymId,
+            $filters['date_from'],
+            $filters['date_to']
+        );
+
+        return [
+            'filters' => $filters,
+            'items' => array_map([$this, 'normalizeDispatchHistoryItem'], $rows),
+        ];
+    }
+
     private function getRequireOpenCash(int $tenantId, int $gymId): bool
     {
         $stored = $this->repo->getSetting($tenantId, $gymId, self::SETTING_REQUIRE_OPEN_CASH);

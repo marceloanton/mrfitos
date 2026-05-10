@@ -136,6 +136,7 @@ $router->add('GET', '/pos/reports/z-close/export', [PosController::class, 'zClos
 $router->add('GET', '/pos/reports/cash-by-operator', [PosController::class, 'cashByOperatorReport'], [AuthMiddleware::class, TenantMiddleware::class, new PermissionMiddleware('pos.report.read')]);
 $router->add('GET', '/pos/alerts', [PosController::class, 'alerts'], [AuthMiddleware::class, TenantMiddleware::class, new PermissionMiddleware('pos.report.read')]);
 $router->add('GET', '/pos/alerts/dispatch-history', [PosController::class, 'dispatchHistory'], [AuthMiddleware::class, TenantMiddleware::class, new PermissionMiddleware('pos.report.read')]);
+$router->add('GET', '/pos/alerts/dispatch-history/export', [PosController::class, 'dispatchHistoryExport'], [AuthMiddleware::class, TenantMiddleware::class, new PermissionMiddleware('pos.report.export')]);
 $router->add('GET', '/pos/alerts/notify-link', [PosController::class, 'alertsNotifyLink'], [AuthMiddleware::class, TenantMiddleware::class, new PermissionMiddleware('pos.report.read'), new PermissionMiddleware('whatsapp.send')]);
 $router->add('POST', '/pos/alerts/notify-critical', [PosController::class, 'notifyCriticalAlert'], [AuthMiddleware::class, TenantMiddleware::class, new PermissionMiddleware('pos.report.read'), new PermissionMiddleware('whatsapp.send')]);
 $router->add('GET', '/pos/alerts/contacts', [PosController::class, 'alertContacts'], [AuthMiddleware::class, TenantMiddleware::class, new PermissionMiddleware('pos.report.read')]);

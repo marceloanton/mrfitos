@@ -373,6 +373,39 @@ final class PosRepository
         ];
     }
 
+    public function exportCriticalAlertDispatchHistory(
+        int $tenantId,
+        int $gymId,
+        ?string $dateFrom,
+        ?string $dateTo
+    ): array {
+        $where = 'tenant_id = :tenant_id
+                  AND gym_id = :gym_id
+                  AND action = "pos_alert_critical_notified"';
+        $params = [
+            'tenant_id' => $tenantId,
+            'gym_id' => $gymId,
+        ];
+
+        if ($dateFrom !== null) {
+            $where .= ' AND created_at >= :date_from_dt';
+            $params['date_from_dt'] = $dateFrom . ' 00:00:00';
+        }
+        if ($dateTo !== null) {
+            $where .= ' AND created_at <= :date_to_dt';
+            $params['date_to_dt'] = $dateTo . ' 23:59:59';
+        }
+
+        $stmt = Database::connection()->prepare(
+            "SELECT id, created_at, user_id, entity_type, entity_id, action, metadata
+             FROM activity_logs
+             WHERE {$where}
+             ORDER BY id DESC"
+        );
+        $stmt->execute($params);
+        return $stmt->fetchAll() ?: [];
+    }
+
     private function buildPosAuditWhere(): string
     {
         return 'al.tenant_id = :tenant_id

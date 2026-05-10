@@ -367,6 +367,24 @@ final class PosController
         }
     }
 
+    public function dispatchHistoryExport(): void
+    {
+        $auth = json_decode($_SERVER['auth_user'] ?? '{}', true) ?: [];
+        $dateFrom = Request::query('date_from', null);
+        $dateTo = Request::query('date_to', null);
+
+        try {
+            $tenantId = (int) ($auth['tenant_id'] ?? 0);
+            $gymId = (int) ($auth['gym_id'] ?? 0);
+            $data = $this->service->exportCriticalAlertDispatchHistory($tenantId, $gymId, $dateFrom, $dateTo);
+            $this->emitDispatchHistoryCsv($data);
+        } catch (\InvalidArgumentException $e) {
+            Response::json(['success' => false, 'message' => $e->getMessage()], 422);
+        } catch (\Throwable $e) {
+            Response::json(['success' => false, 'message' => 'Failed to export POS critical alert dispatch history'], 500);
+        }
+    }
+
     public function alertsNotifyLink(): void
     {
         $auth = json_decode($_SERVER['auth_user'] ?? '{}', true) ?: [];
@@ -730,6 +748,61 @@ final class PosController
                 (string) ($item['ip_address'] ?? ''),
                 (string) ($item['user_agent'] ?? ''),
                 $this->normalizeCsvValue($item['metadata'] ?? null),
+            ]);
+        }
+
+        fclose($out);
+        exit;
+    }
+
+    private function emitDispatchHistoryCsv(array $historyData): never
+    {
+        $filters = is_array($historyData['filters'] ?? null) ? $historyData['filters'] : [];
+        $items = is_array($historyData['items'] ?? null) ? $historyData['items'] : [];
+
+        $suffix = trim((string) ($filters['date_from'] ?? ''));
+        if ($suffix === '') {
+            $suffix = date('Y-m-d');
+        }
+        $filename = 'pos-alert-dispatch-history-' . $suffix . '.csv';
+
+        http_response_code(200);
+        header('Content-Type: text/csv; charset=utf-8');
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
+        header('Cache-Control: no-store, no-cache, must-revalidate');
+
+        $out = fopen('php://output', 'wb');
+        if ($out === false) {
+            Response::json(['success' => false, 'message' => 'Unable to create CSV output'], 500);
+        }
+
+        fputcsv($out, [
+            'id',
+            'created_at',
+            'user_id',
+            'level',
+            'reason',
+            'target_source',
+            'target_label',
+            'whatsapp_link',
+            'entity_type',
+            'entity_id',
+            'action'
+        ]);
+
+        foreach ($items as $item) {
+            fputcsv($out, [
+                $this->normalizeCsvValue($item['id'] ?? null),
+                $this->normalizeCsvValue($item['created_at'] ?? null),
+                $this->normalizeCsvValue($item['user_id'] ?? null),
+                $this->normalizeCsvValue($item['level'] ?? null),
+                $this->normalizeCsvValue($item['reason'] ?? null),
+                $this->normalizeCsvValue($item['target_source'] ?? null),
+                $this->normalizeCsvValue($item['target_label'] ?? null),
+                $this->normalizeCsvValue($item['whatsapp_link'] ?? null),
+                $this->normalizeCsvValue($item['entity_type'] ?? null),
+                $this->normalizeCsvValue($item['entity_id'] ?? null),
+                $this->normalizeCsvValue($item['action'] ?? null),
             ]);
         }
 

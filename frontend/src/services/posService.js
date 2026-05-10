@@ -138,6 +138,14 @@ export async function listPosAlertDispatchHistory(params = {}) {
   return payload(data);
 }
 
+export async function exportPosAlertDispatchHistoryCsv(params = {}) {
+  const { data } = await api.get('/pos/alerts/dispatch-history/export', {
+    params,
+    responseType: 'blob'
+  });
+  return data;
+}
+
 export async function listPosAlertContacts() {
   const { data } = await api.get('/pos/alerts/contacts');
   return payload(data);
