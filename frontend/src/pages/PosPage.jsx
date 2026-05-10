@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { adjustStock, autoSettleMemberAccountCharges, closeCashSession, createPosAlertContact, createPosProduct, createPosSale, deletePosAlertContact, exportPosAlertDispatchHistoryCsv, exportPosAuditCsv, exportPosAutosettleKpiCsv, exportPosZCloseCsv, getCashByOperatorReport, getCashSessionReport, getMemberAccountAging, getMemberAccountCollectionsKpiToday, getMemberAccountFollowupFunnel, getMemberAccountOverdueWhatsAppLink, getMemberAccountPromiseAgenda, getOpenCashSessionSummary, getPosAlertNotifyLink, getPosAlerts, getPosAlertsStatus, getPosAutosettleKpi, getPosConfig, getPosSaleReceipt, getPosSaleReceiptByNumber, getPosSummary, getPosZCloseReport, listCashSessions, listLowStockProducts, listMemberAccountCharges, listPosAlertContacts, listPosAlertDispatchHistory, listPosAlertsCronHistory, listPosAudit, listPosProducts, listPosSales, listStockMovements, notifyCriticalPosAlert, openCashSession, settleMemberAccountCharge, updatePosAlertContact, updatePosConfig, upsertMemberAccountFollowup, voidPosSale } from '../services/posService';
+import { adjustStock, autoSettleMemberAccountCharges, closeCashSession, createPosAlertContact, createPosProduct, createPosSale, deletePosAlertContact, exportMemberAccountPromiseAgendaCsv, exportPosAlertDispatchHistoryCsv, exportPosAuditCsv, exportPosAutosettleKpiCsv, exportPosZCloseCsv, getCashByOperatorReport, getCashSessionReport, getMemberAccountAging, getMemberAccountCollectionsKpiToday, getMemberAccountFollowupFunnel, getMemberAccountOverdueWhatsAppLink, getMemberAccountPromiseAgenda, getOpenCashSessionSummary, getPosAlertNotifyLink, getPosAlerts, getPosAlertsStatus, getPosAutosettleKpi, getPosConfig, getPosSaleReceipt, getPosSaleReceiptByNumber, getPosSummary, getPosZCloseReport, listCashSessions, listLowStockProducts, listMemberAccountCharges, listPosAlertContacts, listPosAlertDispatchHistory, listPosAlertsCronHistory, listPosAudit, listPosProducts, listPosSales, listStockMovements, notifyCriticalPosAlert, openCashSession, settleMemberAccountCharge, updatePosAlertContact, updatePosConfig, upsertMemberAccountFollowup, voidPosSale } from '../services/posService';
 import { useAuthStore } from '../stores/authStore';
 
 export default function PosPage() {
@@ -749,6 +749,21 @@ ${sale.notes ? `Nota: ${sale.notes}` : ''}
     }
   };
 
+  const onExportPromiseAgendaCsv = async () => {
+    setError('');
+    try {
+      const blob = await exportMemberAccountPromiseAgendaCsv({ limit: 100 });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `pos-promise-agenda-${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(err?.response?.data?.message ?? 'No se pudo exportar agenda de promesas.');
+    }
+  };
+
   const onCreateProduct = async () => {
     setError('');
     setMessage('');
@@ -828,6 +843,11 @@ ${sale.notes ? `Nota: ${sale.notes}` : ''}
             <p className="text-lg font-semibold text-red-700">{promiseAgenda.overdue_count}</p>
           </div>
         </div>
+        <div className="mb-3 flex justify-end">
+          <button className="rounded border border-slate-300 px-3 py-2 text-sm disabled:opacity-50" disabled={!canReportExport} onClick={onExportPromiseAgendaCsv}>
+            Exportar Agenda CSV
+          </button>
+        </div>
         <h3 className="mb-2 text-lg font-semibold text-slate-900">Morosidad cuenta socio</h3>
         <div className="mb-3 grid gap-2 md:grid-cols-4">
           <div className="rounded border border-slate-200 p-2">
@@ -893,7 +913,13 @@ ${sale.notes ? `Nota: ${sale.notes}` : ''}
           {promiseAgenda.items.length === 0 ? (
             <p className="text-sm text-slate-500">Sin promesas registradas.</p>
           ) : promiseAgenda.items.map((item) => (
-            <div key={`${item.member_id}-${item.promise_date}`} className="flex items-center justify-between rounded border border-slate-200 p-2 text-sm">
+            <div key={`${item.member_id}-${item.promise_date}`} className={`flex items-center justify-between rounded border p-2 text-sm ${
+              item.promise_date < promiseAgenda.today
+                ? 'border-red-200 bg-red-50'
+                : item.promise_date === promiseAgenda.today
+                  ? 'border-amber-200 bg-amber-50'
+                  : 'border-emerald-200 bg-emerald-50'
+            }`}>
               <span>{item.member_code} · {item.first_name} {item.last_name} · promesa {item.promise_date}</span>
               <span className="font-semibold text-slate-900">${Number(item.overdue_total_amount || 0).toFixed(2)}</span>
             </div>

@@ -202,6 +202,22 @@ final class PosController
         }
     }
 
+    public function memberAccountPromiseAgendaExport(): void
+    {
+        $auth = json_decode($_SERVER['auth_user'] ?? '{}', true) ?: [];
+        $limit = Request::query('limit', null);
+        try {
+            $tenantId = (int) ($auth['tenant_id'] ?? 0);
+            $gymId = (int) ($auth['gym_id'] ?? 0);
+            $data = $this->service->getMemberAccountPromiseAgenda($tenantId, $gymId, $limit);
+            $this->emitMemberAccountPromiseAgendaCsv($tenantId, $gymId, $data);
+        } catch (\InvalidArgumentException $e) {
+            Response::json(['success' => false, 'message' => $e->getMessage()], 422);
+        } catch (\Throwable $e) {
+            Response::json(['success' => false, 'message' => 'Failed to export member account promise agenda'], 500);
+        }
+    }
+
     public function createProduct(): void
     {
         $auth = json_decode($_SERVER['auth_user'] ?? '{}', true) ?: [];
@@ -1230,6 +1246,48 @@ final class PosController
                 $this->normalizeCsvValue($row['settled_total'] ?? null),
                 $this->normalizeCsvValue($row['failed_total'] ?? null),
                 $this->normalizeCsvValue($row['settled_amount_total'] ?? null),
+            ]);
+        }
+
+        fclose($out);
+        exit;
+    }
+
+    private function emitMemberAccountPromiseAgendaCsv(int $tenantId, int $gymId, array $agenda): never
+    {
+        $filename = 'pos-member-account-promise-agenda-' . date('Y-m-d') . '.csv';
+        http_response_code(200);
+        header('Content-Type: text/csv; charset=utf-8');
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
+        header('Cache-Control: no-store, no-cache, must-revalidate');
+
+        $out = fopen('php://output', 'wb');
+        if ($out === false) {
+            Response::json(['success' => false, 'message' => 'Unable to create CSV output'], 500);
+        }
+
+        fputcsv($out, ['section', 'field', 'value']);
+        fputcsv($out, ['metadata', 'tenant_id', (string) $tenantId]);
+        fputcsv($out, ['metadata', 'gym_id', (string) $gymId]);
+        fputcsv($out, ['summary', 'today', (string) ($agenda['today'] ?? '')]);
+        fputcsv($out, ['summary', 'due_today_count', (string) ($agenda['due_today_count'] ?? 0)]);
+        fputcsv($out, ['summary', 'overdue_count', (string) ($agenda['overdue_count'] ?? 0)]);
+        fputcsv($out, ['', '', '']);
+
+        fputcsv($out, ['items', 'member_id', 'member_code', 'first_name', 'last_name', 'promise_date', 'overdue_total_amount', 'overdue_charges_count', 'notes', 'updated_at']);
+        $items = is_array($agenda['items'] ?? null) ? $agenda['items'] : [];
+        foreach ($items as $item) {
+            fputcsv($out, [
+                'items',
+                $this->normalizeCsvValue($item['member_id'] ?? null),
+                $this->normalizeCsvValue($item['member_code'] ?? null),
+                $this->normalizeCsvValue($item['first_name'] ?? null),
+                $this->normalizeCsvValue($item['last_name'] ?? null),
+                $this->normalizeCsvValue($item['promise_date'] ?? null),
+                $this->normalizeCsvValue($item['overdue_total_amount'] ?? null),
+                $this->normalizeCsvValue($item['overdue_charges_count'] ?? null),
+                $this->normalizeCsvValue($item['notes'] ?? null),
+                $this->normalizeCsvValue($item['updated_at'] ?? null),
             ]);
         }
 

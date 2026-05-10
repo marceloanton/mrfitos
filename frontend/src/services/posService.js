@@ -110,6 +110,14 @@ export async function getMemberAccountPromiseAgenda(params = {}) {
   return payload(data);
 }
 
+export async function exportMemberAccountPromiseAgendaCsv(params = {}) {
+  const { data } = await api.get('/pos/member-account/promise-agenda/export', {
+    params,
+    responseType: 'blob'
+  });
+  return data;
+}
+
 export async function settleMemberAccountCharge(id, body = {}) {
   const { data } = await api.post(`/pos/member-account/charges/${id}/settle`, body);
   return payload(data);
