@@ -374,7 +374,10 @@ export default function PosPage() {
 
   useEffect(() => {
     if (!rankingFiltersHydratedRef.current) return;
-    load();
+    const timer = window.setTimeout(() => {
+      load();
+    }, 200);
+    return () => window.clearTimeout(timer);
   }, [collectorRankingLimit, collectorRankingSortBy, collectorRankingSortDir]);
 
   const onAdjustStock = async () => {
