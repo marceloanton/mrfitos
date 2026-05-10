@@ -335,6 +335,56 @@ final class PosService
         return ['updated_count' => $updated];
     }
 
+    public function buildOverduePromiseWhatsAppBatch(int $tenantId, int $gymId, mixed $limitInput): array
+    {
+        $limit = is_numeric($limitInput) ? (int) $limitInput : 200;
+        if ($limit < 1) {
+            $limit = 200;
+        }
+        if ($limit > 500) {
+            $limit = 500;
+        }
+
+        $rows = $this->repo->listOverduePromiseMembersForWhatsApp($tenantId, $gymId, $limit);
+        $items = [];
+        foreach ($rows as $row) {
+            $phoneNormalized = $this->normalizePhoneDigits((string) ($row['phone'] ?? ''));
+            if ($phoneNormalized === null) {
+                continue;
+            }
+            $memberName = trim((string) ($row['first_name'] ?? '') . ' ' . (string) ($row['last_name'] ?? ''));
+            $overdueTotalAmount = (float) ($row['overdue_total_amount'] ?? 0);
+            $overdueChargesCount = (int) ($row['overdue_charges_count'] ?? 0);
+            $maxDaysOverdue = (int) ($row['max_days_overdue'] ?? 0);
+            $text = sprintf(
+                'Hola %s, registramos una promesa vencida y un saldo pendiente de $%.2f (%d cargos, %d dias de atraso). Escribinos para regularizarlo hoy.',
+                $memberName !== '' ? $memberName : 'socio/a',
+                $overdueTotalAmount,
+                $overdueChargesCount,
+                $maxDaysOverdue
+            );
+            $items[] = [
+                'member_id' => (int) ($row['member_id'] ?? 0),
+                'member_code' => (string) ($row['member_code'] ?? ''),
+                'member_name' => $memberName,
+                'promise_date' => (string) ($row['promise_date'] ?? ''),
+                'phone_normalized' => $phoneNormalized,
+                'overdue_total_amount' => $overdueTotalAmount,
+                'overdue_charges_count' => $overdueChargesCount,
+                'max_days_overdue' => $maxDaysOverdue,
+                'message_text' => $text,
+                'whatsapp_link' => 'https://wa.me/' . $phoneNormalized . '?text=' . rawurlencode($text),
+            ];
+        }
+
+        return [
+            'generated_at' => date('Y-m-d H:i:s'),
+            'requested_limit' => $limit,
+            'items_count' => count($items),
+            'items' => $items,
+        ];
+    }
+
     public function buildMemberOverdueWhatsAppLink(int $tenantId, int $gymId, int $memberId, ?int $actorUserId = null): array
     {
         if ($memberId <= 0) {

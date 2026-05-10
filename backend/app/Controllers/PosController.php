@@ -235,6 +235,40 @@ final class PosController
         }
     }
 
+    public function memberAccountPromiseAgendaOverdueWhatsAppLinks(): void
+    {
+        $auth = json_decode($_SERVER['auth_user'] ?? '{}', true) ?: [];
+        $limit = Request::query('limit', null);
+        try {
+            $data = $this->service->buildOverduePromiseWhatsAppBatch(
+                (int) ($auth['tenant_id'] ?? 0),
+                (int) ($auth['gym_id'] ?? 0),
+                $limit
+            );
+            Response::json(['success' => true, 'data' => $data]);
+        } catch (\InvalidArgumentException $e) {
+            Response::json(['success' => false, 'message' => $e->getMessage()], 422);
+        } catch (\Throwable $e) {
+            Response::json(['success' => false, 'message' => 'Failed to build overdue promise WhatsApp links'], 500);
+        }
+    }
+
+    public function memberAccountPromiseAgendaOverdueWhatsAppLinksExport(): void
+    {
+        $auth = json_decode($_SERVER['auth_user'] ?? '{}', true) ?: [];
+        $limit = Request::query('limit', null);
+        try {
+            $tenantId = (int) ($auth['tenant_id'] ?? 0);
+            $gymId = (int) ($auth['gym_id'] ?? 0);
+            $data = $this->service->buildOverduePromiseWhatsAppBatch($tenantId, $gymId, $limit);
+            $this->emitOverduePromiseWhatsAppLinksCsv($tenantId, $gymId, $data);
+        } catch (\InvalidArgumentException $e) {
+            Response::json(['success' => false, 'message' => $e->getMessage()], 422);
+        } catch (\Throwable $e) {
+            Response::json(['success' => false, 'message' => 'Failed to export overdue promise WhatsApp links'], 500);
+        }
+    }
+
     public function createProduct(): void
     {
         $auth = json_decode($_SERVER['auth_user'] ?? '{}', true) ?: [];
@@ -1305,6 +1339,47 @@ final class PosController
                 $this->normalizeCsvValue($item['overdue_charges_count'] ?? null),
                 $this->normalizeCsvValue($item['notes'] ?? null),
                 $this->normalizeCsvValue($item['updated_at'] ?? null),
+            ]);
+        }
+
+        fclose($out);
+        exit;
+    }
+
+    private function emitOverduePromiseWhatsAppLinksCsv(int $tenantId, int $gymId, array $batch): never
+    {
+        $filename = 'pos-overdue-promise-whatsapp-links-' . date('Y-m-d') . '.csv';
+        http_response_code(200);
+        header('Content-Type: text/csv; charset=utf-8');
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
+        header('Cache-Control: no-store, no-cache, must-revalidate');
+
+        $out = fopen('php://output', 'wb');
+        if ($out === false) {
+            Response::json(['success' => false, 'message' => 'Unable to create CSV output'], 500);
+        }
+
+        fputcsv($out, ['section', 'field', 'value']);
+        fputcsv($out, ['metadata', 'tenant_id', (string) $tenantId]);
+        fputcsv($out, ['metadata', 'gym_id', (string) $gymId]);
+        fputcsv($out, ['metadata', 'generated_at', (string) ($batch['generated_at'] ?? '')]);
+        fputcsv($out, ['metadata', 'items_count', (string) ($batch['items_count'] ?? 0)]);
+        fputcsv($out, ['', '', '']);
+        fputcsv($out, ['items', 'member_id', 'member_code', 'member_name', 'promise_date', 'phone_normalized', 'overdue_total_amount', 'overdue_charges_count', 'max_days_overdue', 'whatsapp_link']);
+
+        $items = is_array($batch['items'] ?? null) ? $batch['items'] : [];
+        foreach ($items as $item) {
+            fputcsv($out, [
+                'items',
+                $this->normalizeCsvValue($item['member_id'] ?? null),
+                $this->normalizeCsvValue($item['member_code'] ?? null),
+                $this->normalizeCsvValue($item['member_name'] ?? null),
+                $this->normalizeCsvValue($item['promise_date'] ?? null),
+                $this->normalizeCsvValue($item['phone_normalized'] ?? null),
+                $this->normalizeCsvValue($item['overdue_total_amount'] ?? null),
+                $this->normalizeCsvValue($item['overdue_charges_count'] ?? null),
+                $this->normalizeCsvValue($item['max_days_overdue'] ?? null),
+                $this->normalizeCsvValue($item['whatsapp_link'] ?? null),
             ]);
         }
 

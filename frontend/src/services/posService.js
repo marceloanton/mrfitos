@@ -123,6 +123,19 @@ export async function bulkMarkPromiseAgendaContacted() {
   return payload(data);
 }
 
+export async function getOverduePromiseWhatsAppLinks(params = {}) {
+  const { data } = await api.get('/pos/member-account/promise-agenda/overdue-whatsapp-links', { params });
+  return payload(data);
+}
+
+export async function exportOverduePromiseWhatsAppLinksCsv(params = {}) {
+  const { data } = await api.get('/pos/member-account/promise-agenda/overdue-whatsapp-links/export', {
+    params,
+    responseType: 'blob'
+  });
+  return data;
+}
+
 export async function settleMemberAccountCharge(id, body = {}) {
   const { data } = await api.post(`/pos/member-account/charges/${id}/settle`, body);
   return payload(data);

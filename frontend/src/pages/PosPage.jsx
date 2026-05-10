@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { adjustStock, autoSettleMemberAccountCharges, bulkMarkPromiseAgendaContacted, closeCashSession, createPosAlertContact, createPosProduct, createPosSale, deletePosAlertContact, exportMemberAccountPromiseAgendaCsv, exportPosAlertDispatchHistoryCsv, exportPosAuditCsv, exportPosAutosettleKpiCsv, exportPosZCloseCsv, getCashByOperatorReport, getCashSessionReport, getMemberAccountAging, getMemberAccountCollectionsKpiToday, getMemberAccountFollowupFunnel, getMemberAccountOverdueWhatsAppLink, getMemberAccountPromiseAgenda, getOpenCashSessionSummary, getPosAlertNotifyLink, getPosAlerts, getPosAlertsStatus, getPosAutosettleKpi, getPosConfig, getPosSaleReceipt, getPosSaleReceiptByNumber, getPosSummary, getPosZCloseReport, listCashSessions, listLowStockProducts, listMemberAccountCharges, listPosAlertContacts, listPosAlertDispatchHistory, listPosAlertsCronHistory, listPosAudit, listPosProducts, listPosSales, listStockMovements, notifyCriticalPosAlert, openCashSession, settleMemberAccountCharge, updatePosAlertContact, updatePosConfig, upsertMemberAccountFollowup, voidPosSale } from '../services/posService';
+import { adjustStock, autoSettleMemberAccountCharges, bulkMarkPromiseAgendaContacted, closeCashSession, createPosAlertContact, createPosProduct, createPosSale, deletePosAlertContact, exportMemberAccountPromiseAgendaCsv, exportOverduePromiseWhatsAppLinksCsv, exportPosAlertDispatchHistoryCsv, exportPosAuditCsv, exportPosAutosettleKpiCsv, exportPosZCloseCsv, getCashByOperatorReport, getCashSessionReport, getMemberAccountAging, getMemberAccountCollectionsKpiToday, getMemberAccountFollowupFunnel, getMemberAccountOverdueWhatsAppLink, getMemberAccountPromiseAgenda, getOpenCashSessionSummary, getOverduePromiseWhatsAppLinks, getPosAlertNotifyLink, getPosAlerts, getPosAlertsStatus, getPosAutosettleKpi, getPosConfig, getPosSaleReceipt, getPosSaleReceiptByNumber, getPosSummary, getPosZCloseReport, listCashSessions, listLowStockProducts, listMemberAccountCharges, listPosAlertContacts, listPosAlertDispatchHistory, listPosAlertsCronHistory, listPosAudit, listPosProducts, listPosSales, listStockMovements, notifyCriticalPosAlert, openCashSession, settleMemberAccountCharge, updatePosAlertContact, updatePosConfig, upsertMemberAccountFollowup, voidPosSale } from '../services/posService';
 import { useAuthStore } from '../stores/authStore';
 
 export default function PosPage() {
@@ -776,6 +776,36 @@ ${sale.notes ? `Nota: ${sale.notes}` : ''}
     }
   };
 
+  const onExportOverduePromiseWhatsAppCsv = async () => {
+    setError('');
+    try {
+      const blob = await exportOverduePromiseWhatsAppLinksCsv({ limit: 200 });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `pos-overdue-promise-whatsapp-links-${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(err?.response?.data?.message ?? 'No se pudo exportar lote WhatsApp de promesas vencidas.');
+    }
+  };
+
+  const onOpenFirstOverduePromiseWhatsApp = async () => {
+    setError('');
+    try {
+      const data = await getOverduePromiseWhatsAppLinks({ limit: 1 });
+      const first = Array.isArray(data?.items) ? data.items[0] : null;
+      if (!first?.whatsapp_link) {
+        setError('No hay links de WhatsApp disponibles para promesas vencidas.');
+        return;
+      }
+      window.open(first.whatsapp_link, '_blank', 'noopener,noreferrer');
+    } catch (err) {
+      setError(err?.response?.data?.message ?? 'No se pudo generar WhatsApp para promesas vencidas.');
+    }
+  };
+
   const onCreateProduct = async () => {
     setError('');
     setMessage('');
@@ -858,6 +888,12 @@ ${sale.notes ? `Nota: ${sale.notes}` : ''}
         <div className="mb-3 flex justify-end">
           <button className="mr-2 rounded border border-amber-300 px-3 py-2 text-sm text-amber-700 disabled:opacity-50" disabled={!canSaleCreate} onClick={onBulkMarkPromiseContacted}>
             Marcar vencidas como contactadas
+          </button>
+          <button className="mr-2 rounded border border-emerald-300 px-3 py-2 text-sm text-emerald-700 disabled:opacity-50" disabled={!hasPermission('whatsapp.send')} onClick={onOpenFirstOverduePromiseWhatsApp}>
+            WhatsApp 1er vencida
+          </button>
+          <button className="mr-2 rounded border border-emerald-300 px-3 py-2 text-sm text-emerald-700 disabled:opacity-50" disabled={!canReportExport} onClick={onExportOverduePromiseWhatsAppCsv}>
+            Exportar Links WhatsApp
           </button>
           <button className="rounded border border-slate-300 px-3 py-2 text-sm disabled:opacity-50" disabled={!canReportExport} onClick={onExportPromiseAgendaCsv}>
             Exportar Agenda CSV

@@ -1965,4 +1965,45 @@ final class PosRepository
         ]);
         return $stmt->rowCount();
     }
+
+    public function listOverduePromiseMembersForWhatsApp(int $tenantId, int $gymId, int $limit = 200): array
+    {
+        $stmt = Database::connection()->prepare(
+            'SELECT
+                f.member_id,
+                f.promise_date,
+                m.member_code,
+                m.first_name,
+                m.last_name,
+                m.phone,
+                COALESCE(SUM(c.amount), 0) AS overdue_total_amount,
+                COUNT(c.id) AS overdue_charges_count,
+                MAX(DATEDIFF(CURDATE(), c.due_date)) AS max_days_overdue
+             FROM member_account_followups f
+             INNER JOIN members m
+               ON m.id = f.member_id
+              AND m.tenant_id = f.tenant_id
+              AND m.gym_id = f.gym_id
+             LEFT JOIN member_account_charges c
+               ON c.member_id = f.member_id
+              AND c.tenant_id = f.tenant_id
+              AND c.gym_id = f.gym_id
+              AND c.status = "pending_auto_debit"
+              AND c.due_date IS NOT NULL
+              AND c.due_date <= CURDATE()
+             WHERE f.tenant_id = :tenant_id
+               AND f.gym_id = :gym_id
+               AND f.status = "promise"
+               AND f.promise_date IS NOT NULL
+               AND f.promise_date < CURDATE()
+             GROUP BY f.member_id, f.promise_date, m.member_code, m.first_name, m.last_name, m.phone
+             ORDER BY f.promise_date ASC, overdue_total_amount DESC
+             LIMIT :limit'
+        );
+        $stmt->bindValue(':tenant_id', $tenantId, \PDO::PARAM_INT);
+        $stmt->bindValue(':gym_id', $gymId, \PDO::PARAM_INT);
+        $stmt->bindValue(':limit', $limit, \PDO::PARAM_INT);
+        $stmt->execute();
+        return $stmt->fetchAll() ?: [];
+    }
 }
