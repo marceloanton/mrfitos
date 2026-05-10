@@ -151,6 +151,9 @@ export default function PosPage() {
     if (apiMessage === 'date range must be <= 92 days') {
       return 'El rango de fechas no puede superar 92 días.';
     }
+    if (apiMessage === 'Monthly POS sales limit reached for current plan. Upgrade required.') {
+      return 'Alcanzaste el límite mensual de ventas POS de tu plan. Actualizá el plan para seguir vendiendo.';
+    }
     return apiMessage || fallbackMessage;
   };
   const isRangeWithin92Days = (from, to) => {
@@ -844,7 +847,7 @@ ${sale.notes ? `Nota: ${sale.notes}` : ''}
       setQty('1');
       await load();
     } catch (err) {
-      setError(err?.response?.data?.message ?? 'No se pudo crear la venta POS.');
+      setError(toFriendlyApiError(err, 'No se pudo crear la venta POS.'));
     } finally {
       setLoading(false);
     }

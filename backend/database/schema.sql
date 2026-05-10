@@ -525,7 +525,8 @@ VALUES
    'max_staff_users', 1,
    'max_gyms', 1,
    'max_monthly_payments', 90,
-   'max_monthly_checkins', 250
+   'max_monthly_checkins', 250,
+   'max_monthly_pos_sales', 120
  ),
  1),
 ('pro', 'Pro', 74900, 'ARS',
@@ -545,7 +546,8 @@ VALUES
    'max_staff_users', 6,
    'max_gyms', 2,
    'max_monthly_payments', 600,
-   'max_monthly_checkins', 2000
+   'max_monthly_checkins', 2000,
+   'max_monthly_pos_sales', 1200
  ),
  1),
 ('scale', 'Scale', 124900, 'ARS',
@@ -565,7 +567,8 @@ VALUES
    'max_staff_users', 999999,
    'max_gyms', 10,
    'max_monthly_payments', 999999,
-   'max_monthly_checkins', 999999
+   'max_monthly_checkins', 999999,
+   'max_monthly_pos_sales', 999999
  ),
  1)
 ON DUPLICATE KEY UPDATE

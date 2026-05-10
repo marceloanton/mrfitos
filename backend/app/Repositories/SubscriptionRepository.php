@@ -87,6 +87,21 @@ final class SubscriptionRepository
         return (int) $stmt->fetchColumn();
     }
 
+    public function countMonthlyPosSales(int $tenantId, int $gymId): int
+    {
+        $stmt = Database::connection()->prepare(
+            'SELECT COUNT(*)
+             FROM pos_sales
+             WHERE tenant_id = :tenant_id
+               AND gym_id = :gym_id
+               AND deleted_at IS NULL
+               AND YEAR(created_at) = YEAR(CURRENT_DATE())
+               AND MONTH(created_at) = MONTH(CURRENT_DATE())'
+        );
+        $stmt->execute(['tenant_id' => $tenantId, 'gym_id' => $gymId]);
+        return (int) $stmt->fetchColumn();
+    }
+
     public function getActiveAddonFeaturesByTenant(int $tenantId): array
     {
         $stmt = Database::connection()->prepare(

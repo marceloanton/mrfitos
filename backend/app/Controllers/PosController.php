@@ -3,6 +3,7 @@
 namespace App\Controllers;
 
 use App\Services\PosService;
+use App\Services\SubscriptionService;
 use Core\Request;
 use Core\Response;
 
@@ -413,6 +414,13 @@ final class PosController
     public function createSale(): void
     {
         $auth = json_decode($_SERVER['auth_user'] ?? '{}', true) ?: [];
+        $subscription = new SubscriptionService();
+        if (!$subscription->validateMonthlyPosSalesLimit((int) $auth['tenant_id'], (int) $auth['gym_id'])) {
+            Response::json([
+                'success' => false,
+                'message' => 'Monthly POS sales limit reached for current plan. Upgrade required.'
+            ], 402);
+        }
         try {
             $data = $this->service->createSale(
                 (int) $auth['tenant_id'],

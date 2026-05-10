@@ -93,6 +93,17 @@ final class SubscriptionService
         return $current < $maxMonthlyCheckins;
     }
 
+    public function validateMonthlyPosSalesLimit(int $tenantId, int $gymId): bool
+    {
+        $ent = $this->getTenantEntitlements($tenantId);
+        $maxMonthlyPosSales = (int) ($ent['limits']['max_monthly_pos_sales'] ?? 0);
+        if ($maxMonthlyPosSales <= 0) {
+            return true;
+        }
+        $current = $this->repo->countMonthlyPosSales($tenantId, $gymId);
+        return $current < $maxMonthlyPosSales;
+    }
+
     private function mergeFeatures(array $planFeatures, array $addonFeatures): array
     {
         $merged = $planFeatures;
