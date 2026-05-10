@@ -47,6 +47,14 @@ $env:CRON_BEARER_TOKEN="TU_CRON_TOKEN"
 .\run-pos-alerts-cron.ps1 -BaseUrl "http://localhost:8080" -TenantId 1 -GymId 1 -CooldownMinutes 60
 ```
 
+## Script BAT (doble click)
+
+También se agregó:
+
+- `run-pos-alerts-cron.bat`
+
+Requiere variable de entorno `CRON_BEARER_TOKEN` configurada en Windows.
+
 ## Respuesta esperada
 
 ```json
