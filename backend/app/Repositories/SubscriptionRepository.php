@@ -102,6 +102,35 @@ final class SubscriptionRepository
         return (int) $stmt->fetchColumn();
     }
 
+    public function countMonthlyWhatsAppMessages(int $tenantId, int $gymId): int
+    {
+        $stmt = Database::connection()->prepare(
+            'SELECT COUNT(*)
+             FROM whatsapp_batch_items
+             WHERE tenant_id = :tenant_id
+               AND gym_id = :gym_id
+               AND YEAR(created_at) = YEAR(CURRENT_DATE())
+               AND MONTH(created_at) = MONTH(CURRENT_DATE())'
+        );
+        $stmt->execute(['tenant_id' => $tenantId, 'gym_id' => $gymId]);
+        return (int) $stmt->fetchColumn();
+    }
+
+    public function countMonthlyReportQueries(int $tenantId, int $gymId): int
+    {
+        $stmt = Database::connection()->prepare(
+            'SELECT COUNT(*)
+             FROM activity_logs
+             WHERE tenant_id = :tenant_id
+               AND gym_id = :gym_id
+               AND action = "reports_renewals_query"
+               AND YEAR(created_at) = YEAR(CURRENT_DATE())
+               AND MONTH(created_at) = MONTH(CURRENT_DATE())'
+        );
+        $stmt->execute(['tenant_id' => $tenantId, 'gym_id' => $gymId]);
+        return (int) $stmt->fetchColumn();
+    }
+
     public function getActiveAddonFeaturesByTenant(int $tenantId): array
     {
         $stmt = Database::connection()->prepare(

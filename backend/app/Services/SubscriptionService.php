@@ -104,6 +104,29 @@ final class SubscriptionService
         return $current < $maxMonthlyPosSales;
     }
 
+    public function validateMonthlyWhatsAppMessagesLimit(int $tenantId, int $gymId, int $requestedItems = 1): bool
+    {
+        $ent = $this->getTenantEntitlements($tenantId);
+        $maxMonthlyMessages = (int) ($ent['limits']['max_monthly_whatsapp_messages'] ?? 0);
+        if ($maxMonthlyMessages <= 0) {
+            return true;
+        }
+        $requested = max(1, $requestedItems);
+        $current = $this->repo->countMonthlyWhatsAppMessages($tenantId, $gymId);
+        return ($current + $requested) <= $maxMonthlyMessages;
+    }
+
+    public function validateMonthlyReportsQueriesLimit(int $tenantId, int $gymId): bool
+    {
+        $ent = $this->getTenantEntitlements($tenantId);
+        $maxMonthlyQueries = (int) ($ent['limits']['max_monthly_reports_queries'] ?? 0);
+        if ($maxMonthlyQueries <= 0) {
+            return true;
+        }
+        $current = $this->repo->countMonthlyReportQueries($tenantId, $gymId);
+        return $current < $maxMonthlyQueries;
+    }
+
     private function mergeFeatures(array $planFeatures, array $addonFeatures): array
     {
         $merged = $planFeatures;

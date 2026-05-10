@@ -526,7 +526,9 @@ VALUES
    'max_gyms', 1,
    'max_monthly_payments', 90,
    'max_monthly_checkins', 250,
-   'max_monthly_pos_sales', 120
+   'max_monthly_pos_sales', 120,
+   'max_monthly_whatsapp_messages', 150,
+   'max_monthly_reports_queries', 40
  ),
  1),
 ('pro', 'Pro', 74900, 'ARS',
@@ -547,7 +549,9 @@ VALUES
    'max_gyms', 2,
    'max_monthly_payments', 600,
    'max_monthly_checkins', 2000,
-   'max_monthly_pos_sales', 1200
+   'max_monthly_pos_sales', 1200,
+   'max_monthly_whatsapp_messages', 4000,
+   'max_monthly_reports_queries', 600
  ),
  1),
 ('scale', 'Scale', 124900, 'ARS',
@@ -568,7 +572,9 @@ VALUES
    'max_gyms', 10,
    'max_monthly_payments', 999999,
    'max_monthly_checkins', 999999,
-   'max_monthly_pos_sales', 999999
+   'max_monthly_pos_sales', 999999,
+   'max_monthly_whatsapp_messages', 999999,
+   'max_monthly_reports_queries', 999999
  ),
  1)
 ON DUPLICATE KEY UPDATE

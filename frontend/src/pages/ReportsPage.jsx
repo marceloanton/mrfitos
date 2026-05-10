@@ -1,6 +1,14 @@
 import { useMemo, useState } from 'react';
 import { fetchRenewalsReport } from '../services/reportsService';
 
+function toFriendlyReportError(err, fallback) {
+  const apiMessage = err?.response?.data?.message;
+  if (apiMessage === 'Monthly reports queries limit reached for current plan. Upgrade required.') {
+    return 'Alcanzaste el límite mensual de consultas de reportes de tu plan. Actualizá el plan para continuar.';
+  }
+  return apiMessage || fallback;
+}
+
 function downloadCsv(rows) {
   const headers = ['membership_id', 'end_date', 'member_code', 'name', 'phone', 'plan_name', 'reminder_status'];
   const csv = [headers.join(',')]
@@ -46,7 +54,7 @@ export default function ReportsPage() {
       setSummary(data.summary);
       setItems(data.items || []);
     } catch (err) {
-      setError(err?.response?.data?.message ?? 'No se pudo cargar reporte');
+      setError(toFriendlyReportError(err, 'No se pudo cargar reporte'));
     } finally {
       setLoading(false);
     }

@@ -1,4 +1,4 @@
-const PLAN_LIMIT_ENDPOINTS = ['/members', '/payments', '/attendance'];
+const PLAN_LIMIT_ENDPOINTS = ['/members', '/payments', '/attendance', '/pos/sales', '/reminders/batch', '/reports/renewals'];
 
 function matchesPlanLimitEndpoint(url = '') {
   return PLAN_LIMIT_ENDPOINTS.some((endpoint) => url.includes(endpoint));

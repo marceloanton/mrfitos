@@ -9,6 +9,13 @@ import {
 import { useAuthStore } from '../stores/authStore';
 
 const defaultTemplate = 'Hola {{name}}, te recordamos que tu plan {{plan_name}} vence el {{end_date}}. Si queres renovarlo, respondé este mensaje.';
+function toFriendlyReminderError(err, fallback) {
+  const apiMessage = err?.response?.data?.message;
+  if (apiMessage === 'Monthly WhatsApp messages limit reached for current plan. Upgrade required.') {
+    return 'Alcanzaste el límite mensual de mensajes WhatsApp de tu plan. Actualizá el plan para continuar.';
+  }
+  return apiMessage || fallback;
+}
 
 export default function RemindersPage() {
   const hasPermission = useAuthStore((s) => s.hasPermission);
@@ -36,7 +43,7 @@ export default function RemindersPage() {
       setItems(data.items ?? []);
       setSelected([]);
     } catch (err) {
-      setError(err?.response?.data?.message ?? 'No se pudieron cargar recordatorios');
+      setError(toFriendlyReminderError(err, 'No se pudieron cargar recordatorios'));
     } finally {
       setLoading(false);
     }
@@ -77,7 +84,7 @@ export default function RemindersPage() {
       setActiveBatchId(data.batch_id ?? null);
       await loadBatches();
     } catch (err) {
-      setError(err?.response?.data?.message ?? 'No se pudo generar el envío masivo');
+      setError(toFriendlyReminderError(err, 'No se pudo generar el envío masivo'));
     } finally {
       setBuilding(false);
     }

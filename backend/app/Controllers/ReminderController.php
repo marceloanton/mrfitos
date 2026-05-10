@@ -3,6 +3,7 @@
 namespace App\Controllers;
 
 use App\Services\ReminderService;
+use App\Services\SubscriptionService;
 use Core\Request;
 use Core\Response;
 
@@ -41,6 +42,17 @@ final class ReminderController
         $input = Request::json();
         $membershipIds = is_array($input['membership_ids'] ?? null) ? $input['membership_ids'] : [];
         $template = (string) ($input['template'] ?? '');
+        $subscription = new SubscriptionService();
+        if (!$subscription->validateMonthlyWhatsAppMessagesLimit(
+            (int) $auth['tenant_id'],
+            (int) $auth['gym_id'],
+            is_array($membershipIds) ? count($membershipIds) : 1
+        )) {
+            Response::json([
+                'success' => false,
+                'message' => 'Monthly WhatsApp messages limit reached for current plan. Upgrade required.'
+            ], 402);
+        }
 
         try {
             $data = $this->service->buildBatch(
