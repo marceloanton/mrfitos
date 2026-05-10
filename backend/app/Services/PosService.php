@@ -503,13 +503,50 @@ final class PosService
     public function getMemberAccountContactEffectivenessToday(int $tenantId, int $gymId): array
     {
         $row = $this->repo->getFollowupContactEffectivenessToday($tenantId, $gymId);
+        $touched = (int) ($row['touched_today_count'] ?? 0);
+        $responded = (int) ($row['responded_count'] ?? 0);
+        $promiseConfirmed = (int) ($row['promise_confirmed_count'] ?? 0);
         return [
             'date' => date('Y-m-d'),
-            'touched_today_count' => (int) ($row['touched_today_count'] ?? 0),
-            'responded_count' => (int) ($row['responded_count'] ?? 0),
+            'touched_today_count' => $touched,
+            'responded_count' => $responded,
             'no_response_count' => (int) ($row['no_response_count'] ?? 0),
             'wrong_number_count' => (int) ($row['wrong_number_count'] ?? 0),
-            'promise_confirmed_count' => (int) ($row['promise_confirmed_count'] ?? 0),
+            'promise_confirmed_count' => $promiseConfirmed,
+            'response_rate' => $touched > 0 ? round(($responded / $touched) * 100, 2) : 0.0,
+            'promise_confirmation_rate' => $touched > 0 ? round(($promiseConfirmed / $touched) * 100, 2) : 0.0,
+        ];
+    }
+
+    public function getMemberAccountContactEffectivenessRange(int $tenantId, int $gymId, mixed $dateFromInput, mixed $dateToInput): array
+    {
+        $dateFrom = $this->resolveOptionalDate($dateFromInput, 'date_from');
+        $dateTo = $this->resolveOptionalDate($dateToInput, 'date_to');
+        if ($dateFrom === null && $dateTo === null) {
+            $dateTo = date('Y-m-d');
+            $dateFrom = date('Y-m-d', strtotime('-6 days'));
+        } elseif ($dateFrom === null) {
+            $dateFrom = $dateTo;
+        } elseif ($dateTo === null) {
+            $dateTo = $dateFrom;
+        }
+        if ($dateFrom > $dateTo) {
+            throw new \InvalidArgumentException('date_from must be <= date_to');
+        }
+        $row = $this->repo->getFollowupContactEffectivenessInRange($tenantId, $gymId, $dateFrom, $dateTo);
+        $touched = (int) ($row['touched_count'] ?? 0);
+        $responded = (int) ($row['responded_count'] ?? 0);
+        $promiseConfirmed = (int) ($row['promise_confirmed_count'] ?? 0);
+        return [
+            'date_from' => $dateFrom,
+            'date_to' => $dateTo,
+            'touched_count' => $touched,
+            'responded_count' => $responded,
+            'no_response_count' => (int) ($row['no_response_count'] ?? 0),
+            'wrong_number_count' => (int) ($row['wrong_number_count'] ?? 0),
+            'promise_confirmed_count' => $promiseConfirmed,
+            'response_rate' => $touched > 0 ? round(($responded / $touched) * 100, 2) : 0.0,
+            'promise_confirmation_rate' => $touched > 0 ? round(($promiseConfirmed / $touched) * 100, 2) : 0.0,
         ];
     }
 

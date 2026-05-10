@@ -2050,4 +2050,28 @@ final class PosRepository
         ]);
         return $stmt->fetch() ?: [];
     }
+
+    public function getFollowupContactEffectivenessInRange(int $tenantId, int $gymId, string $dateFrom, string $dateTo): array
+    {
+        $from = $dateFrom . ' 00:00:00';
+        $to = $dateTo . ' 23:59:59';
+        $stmt = Database::connection()->prepare(
+            'SELECT
+                COALESCE(SUM(CASE WHEN last_contact_result IS NOT NULL AND last_contact_at >= :from_dt AND last_contact_at <= :to_dt THEN 1 ELSE 0 END), 0) AS touched_count,
+                COALESCE(SUM(CASE WHEN last_contact_result = "responded" AND last_contact_at >= :from_dt AND last_contact_at <= :to_dt THEN 1 ELSE 0 END), 0) AS responded_count,
+                COALESCE(SUM(CASE WHEN last_contact_result = "no_response" AND last_contact_at >= :from_dt AND last_contact_at <= :to_dt THEN 1 ELSE 0 END), 0) AS no_response_count,
+                COALESCE(SUM(CASE WHEN last_contact_result = "wrong_number" AND last_contact_at >= :from_dt AND last_contact_at <= :to_dt THEN 1 ELSE 0 END), 0) AS wrong_number_count,
+                COALESCE(SUM(CASE WHEN last_contact_result = "promise_confirmed" AND last_contact_at >= :from_dt AND last_contact_at <= :to_dt THEN 1 ELSE 0 END), 0) AS promise_confirmed_count
+             FROM member_account_followups
+             WHERE tenant_id = :tenant_id
+               AND gym_id = :gym_id'
+        );
+        $stmt->execute([
+            'tenant_id' => $tenantId,
+            'gym_id' => $gymId,
+            'from_dt' => $from,
+            'to_dt' => $to,
+        ]);
+        return $stmt->fetch() ?: [];
+    }
 }

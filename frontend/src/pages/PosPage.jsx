@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { adjustStock, autoSettleMemberAccountCharges, bulkMarkPromiseAgendaContacted, closeCashSession, createPosAlertContact, createPosProduct, createPosSale, deletePosAlertContact, exportMemberAccountPromiseAgendaCsv, exportOverduePromiseWhatsAppLinksCsv, exportPosAlertDispatchHistoryCsv, exportPosAuditCsv, exportPosAutosettleKpiCsv, exportPosZCloseCsv, getCashByOperatorReport, getCashSessionReport, getMemberAccountAging, getMemberAccountCollectionsKpiToday, getMemberAccountContactEffectivenessToday, getMemberAccountFollowupFunnel, getMemberAccountOverdueWhatsAppLink, getMemberAccountPromiseAgenda, getOpenCashSessionSummary, getOverduePromiseWhatsAppLinks, getPosAlertNotifyLink, getPosAlerts, getPosAlertsStatus, getPosAutosettleKpi, getPosConfig, getPosSaleReceipt, getPosSaleReceiptByNumber, getPosSummary, getPosZCloseReport, listCashSessions, listLowStockProducts, listMemberAccountCharges, listPosAlertContacts, listPosAlertDispatchHistory, listPosAlertsCronHistory, listPosAudit, listPosProducts, listPosSales, listStockMovements, notifyCriticalPosAlert, openCashSession, settleMemberAccountCharge, updateMemberAccountFollowupContactResult, updatePosAlertContact, updatePosConfig, upsertMemberAccountFollowup, voidPosSale } from '../services/posService';
+import { adjustStock, autoSettleMemberAccountCharges, bulkMarkPromiseAgendaContacted, closeCashSession, createPosAlertContact, createPosProduct, createPosSale, deletePosAlertContact, exportMemberAccountContactEffectivenessCsv, exportMemberAccountPromiseAgendaCsv, exportOverduePromiseWhatsAppLinksCsv, exportPosAlertDispatchHistoryCsv, exportPosAuditCsv, exportPosAutosettleKpiCsv, exportPosZCloseCsv, getCashByOperatorReport, getCashSessionReport, getMemberAccountAging, getMemberAccountCollectionsKpiToday, getMemberAccountContactEffectiveness, getMemberAccountFollowupFunnel, getMemberAccountOverdueWhatsAppLink, getMemberAccountPromiseAgenda, getOpenCashSessionSummary, getOverduePromiseWhatsAppLinks, getPosAlertNotifyLink, getPosAlerts, getPosAlertsStatus, getPosAutosettleKpi, getPosConfig, getPosSaleReceipt, getPosSaleReceiptByNumber, getPosSummary, getPosZCloseReport, listCashSessions, listLowStockProducts, listMemberAccountCharges, listPosAlertContacts, listPosAlertDispatchHistory, listPosAlertsCronHistory, listPosAudit, listPosProducts, listPosSales, listStockMovements, notifyCriticalPosAlert, openCashSession, settleMemberAccountCharge, updateMemberAccountFollowupContactResult, updatePosAlertContact, updatePosConfig, upsertMemberAccountFollowup, voidPosSale } from '../services/posService';
 import { useAuthStore } from '../stores/authStore';
 
 export default function PosPage() {
@@ -95,7 +95,9 @@ export default function PosPage() {
     responded_count: 0,
     no_response_count: 0,
     wrong_number_count: 0,
-    promise_confirmed_count: 0
+    promise_confirmed_count: 0,
+    response_rate: 0,
+    promise_confirmation_rate: 0
   });
   const [followupDateFrom, setFollowupDateFrom] = useState(() => {
     const d = new Date();
@@ -167,7 +169,10 @@ export default function PosPage() {
           date_to: followupDateTo || undefined
         }),
         getMemberAccountPromiseAgenda({ limit: 20 }),
-        getMemberAccountContactEffectivenessToday()
+        getMemberAccountContactEffectiveness({
+          date_from: followupDateFrom || undefined,
+          date_to: followupDateTo || undefined
+        })
       ]);
       setSales(Array.isArray(salesData?.items) ? salesData.items : []);
       setCharges(Array.isArray(chargesData?.items) ? chargesData.items : []);
@@ -227,11 +232,13 @@ export default function PosPage() {
         items: Array.isArray(promiseAgendaData?.items) ? promiseAgendaData.items : []
       });
       setContactEffectivenessToday({
-        touched_today_count: Number(contactEffectivenessData?.touched_today_count ?? 0),
+        touched_today_count: Number(contactEffectivenessData?.touched_count ?? 0),
         responded_count: Number(contactEffectivenessData?.responded_count ?? 0),
         no_response_count: Number(contactEffectivenessData?.no_response_count ?? 0),
         wrong_number_count: Number(contactEffectivenessData?.wrong_number_count ?? 0),
-        promise_confirmed_count: Number(contactEffectivenessData?.promise_confirmed_count ?? 0)
+        promise_confirmed_count: Number(contactEffectivenessData?.promise_confirmed_count ?? 0),
+        response_rate: Number(contactEffectivenessData?.response_rate ?? 0),
+        promise_confirmation_rate: Number(contactEffectivenessData?.promise_confirmation_rate ?? 0)
       });
     } catch {
       // no-op
@@ -831,6 +838,24 @@ ${sale.notes ? `Nota: ${sale.notes}` : ''}
     }
   };
 
+  const onExportContactEffectivenessCsv = async () => {
+    setError('');
+    try {
+      const blob = await exportMemberAccountContactEffectivenessCsv({
+        date_from: followupDateFrom || undefined,
+        date_to: followupDateTo || undefined
+      });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `pos-contact-effectiveness-${followupDateFrom || 'from'}-to-${followupDateTo || 'to'}.csv`;
+      a.click();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(err?.response?.data?.message ?? 'No se pudo exportar efectividad de contacto.');
+    }
+  };
+
   const onCreateProduct = async () => {
     setError('');
     setMessage('');
@@ -920,6 +945,9 @@ ${sale.notes ? `Nota: ${sale.notes}` : ''}
           <button className="mr-2 rounded border border-emerald-300 px-3 py-2 text-sm text-emerald-700 disabled:opacity-50" disabled={!canReportExport} onClick={onExportOverduePromiseWhatsAppCsv}>
             Exportar Links WhatsApp
           </button>
+          <button className="mr-2 rounded border border-slate-300 px-3 py-2 text-sm disabled:opacity-50" disabled={!canReportExport} onClick={onExportContactEffectivenessCsv}>
+            Exportar Efectividad CSV
+          </button>
           <button className="rounded border border-slate-300 px-3 py-2 text-sm disabled:opacity-50" disabled={!canReportExport} onClick={onExportPromiseAgendaCsv}>
             Exportar Agenda CSV
           </button>
@@ -949,6 +977,10 @@ ${sale.notes ? `Nota: ${sale.notes}` : ''}
           <div className="rounded border border-slate-200 p-2"><p className="text-xs text-slate-500">No respondió</p><p className="text-lg font-semibold">{contactEffectivenessToday.no_response_count}</p></div>
           <div className="rounded border border-amber-200 p-2"><p className="text-xs text-amber-700">Promesa confirmada</p><p className="text-lg font-semibold text-amber-700">{contactEffectivenessToday.promise_confirmed_count}</p></div>
           <div className="rounded border border-red-200 p-2"><p className="text-xs text-red-700">Número incorrecto</p><p className="text-lg font-semibold text-red-700">{contactEffectivenessToday.wrong_number_count}</p></div>
+        </div>
+        <div className="mb-3 grid gap-2 md:grid-cols-2">
+          <div className="rounded border border-slate-200 p-2"><p className="text-xs text-slate-500">Tasa respuesta</p><p className="text-lg font-semibold">{contactEffectivenessToday.response_rate.toFixed(2)}%</p></div>
+          <div className="rounded border border-slate-200 p-2"><p className="text-xs text-slate-500">Tasa promesa confirmada</p><p className="text-lg font-semibold">{contactEffectivenessToday.promise_confirmation_rate.toFixed(2)}%</p></div>
         </div>
         <p className="mb-3 text-sm text-slate-600">
           Vencido total: <strong>{memberAccountAging.overdue_total_count}</strong> cargos · <strong>${memberAccountAging.overdue_total_amount.toFixed(2)}</strong>

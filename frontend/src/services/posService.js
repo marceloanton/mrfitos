@@ -100,6 +100,19 @@ export async function getMemberAccountContactEffectivenessToday() {
   return payload(data);
 }
 
+export async function getMemberAccountContactEffectiveness(params = {}) {
+  const { data } = await api.get('/pos/member-account/contact-effectiveness', { params });
+  return payload(data);
+}
+
+export async function exportMemberAccountContactEffectivenessCsv(params = {}) {
+  const { data } = await api.get('/pos/member-account/contact-effectiveness/export', {
+    params,
+    responseType: 'blob'
+  });
+  return data;
+}
+
 export async function getMemberAccountFollowupFunnel(params = {}) {
   const { data } = await api.get('/pos/member-account/followup-funnel', { params });
   return payload(data);

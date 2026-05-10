@@ -303,6 +303,43 @@ final class PosController
         }
     }
 
+    public function memberAccountContactEffectivenessRange(): void
+    {
+        $auth = json_decode($_SERVER['auth_user'] ?? '{}', true) ?: [];
+        $dateFrom = Request::query('date_from', null);
+        $dateTo = Request::query('date_to', null);
+        try {
+            $data = $this->service->getMemberAccountContactEffectivenessRange(
+                (int) ($auth['tenant_id'] ?? 0),
+                (int) ($auth['gym_id'] ?? 0),
+                $dateFrom,
+                $dateTo
+            );
+            Response::json(['success' => true, 'data' => $data]);
+        } catch (\InvalidArgumentException $e) {
+            Response::json(['success' => false, 'message' => $e->getMessage()], 422);
+        } catch (\Throwable $e) {
+            Response::json(['success' => false, 'message' => 'Failed to fetch contact effectiveness range'], 500);
+        }
+    }
+
+    public function memberAccountContactEffectivenessRangeExport(): void
+    {
+        $auth = json_decode($_SERVER['auth_user'] ?? '{}', true) ?: [];
+        $dateFrom = Request::query('date_from', null);
+        $dateTo = Request::query('date_to', null);
+        try {
+            $tenantId = (int) ($auth['tenant_id'] ?? 0);
+            $gymId = (int) ($auth['gym_id'] ?? 0);
+            $data = $this->service->getMemberAccountContactEffectivenessRange($tenantId, $gymId, $dateFrom, $dateTo);
+            $this->emitMemberAccountContactEffectivenessCsv($tenantId, $gymId, $data);
+        } catch (\InvalidArgumentException $e) {
+            Response::json(['success' => false, 'message' => $e->getMessage()], 422);
+        } catch (\Throwable $e) {
+            Response::json(['success' => false, 'message' => 'Failed to export contact effectiveness range'], 500);
+        }
+    }
+
     public function createProduct(): void
     {
         $auth = json_decode($_SERVER['auth_user'] ?? '{}', true) ?: [];
@@ -1417,6 +1454,27 @@ final class PosController
             ]);
         }
 
+        fclose($out);
+        exit;
+    }
+
+    private function emitMemberAccountContactEffectivenessCsv(int $tenantId, int $gymId, array $data): never
+    {
+        $filename = 'pos-contact-effectiveness-' . (($data['date_from'] ?? date('Y-m-d')) . '-to-' . ($data['date_to'] ?? date('Y-m-d'))) . '.csv';
+        http_response_code(200);
+        header('Content-Type: text/csv; charset=utf-8');
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
+        header('Cache-Control: no-store, no-cache, must-revalidate');
+        $out = fopen('php://output', 'wb');
+        if ($out === false) {
+            Response::json(['success' => false, 'message' => 'Unable to create CSV output'], 500);
+        }
+        fputcsv($out, ['section', 'field', 'value']);
+        fputcsv($out, ['metadata', 'tenant_id', (string) $tenantId]);
+        fputcsv($out, ['metadata', 'gym_id', (string) $gymId]);
+        foreach ($data as $k => $v) {
+            fputcsv($out, ['kpi', (string) $k, $this->normalizeCsvValue($v)]);
+        }
         fclose($out);
         exit;
     }
