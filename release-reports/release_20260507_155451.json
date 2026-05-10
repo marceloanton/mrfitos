@@ -1,0 +1,18 @@
+{
+    "mode":  "standard",
+    "timestamp":  "2026-05-07T15:54:51.6771587-03:00",
+    "db_name":  "gymsaas",
+    "api_base_url":  "http://localhost:8080",
+    "skip_backup":  true,
+    "skip_build":  true,
+    "steps":  {
+                  "php_lint":  "ok",
+                  "frontend_build":  "skipped",
+                  "db_backup":  "skipped",
+                  "migration":  "ok",
+                  "health_check":  "ok"
+              },
+    "backup_file":  null,
+    "success":  true,
+    "error":  null
+}

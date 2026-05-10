@@ -1,0 +1,10 @@
+{
+    "mode":  "smoke",
+    "timestamp":  "2026-05-07T15:51:32.4285416-03:00",
+    "api_base_url":  "http://localhost:8080",
+    "steps":  {
+
+              },
+    "success":  false,
+    "error":  "No es posible conectar con el servidor remoto"
+}

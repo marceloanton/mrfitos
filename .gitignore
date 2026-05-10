@@ -1,0 +1,32 @@
+## OS / Editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+## Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+## Env files
+.env
+.env.*
+!.env.example
+!.env.production.example
+
+## Frontend
+frontend/node_modules/
+frontend/dist/
+
+## Backend runtime
+backend/storage/*.log
+backend/storage/cache/
+backend/storage/sessions/
+backend/storage/tmp/
+
+## Build / temp
+tmp/
+temp/
+*.tmp

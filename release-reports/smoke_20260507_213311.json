@@ -1,0 +1,27 @@
+{
+  "mode": "smoke",
+  "timestamp": "2026-05-07T21:33:11.1296608-03:00",
+  "api_base_url": "http://localhost:8080",
+  "steps": {
+    "health": "ok",
+    "pricing_cache": {
+      "status": "ok",
+      "first_status": 200,
+      "second_status": 304,
+      "etag_present": true,
+      "cache_control_present": true,
+      "cache_control": "public, max-age=300",
+      "if_modified_since_checked": true,
+      "if_modified_since_status": 304
+    },
+    "login": "ok",
+    "auth_me": "ok",
+    "dashboard": "ok",
+    "members": "ok",
+    "attendance": "ok",
+    "reminders": "ok",
+    "reports": "ok"
+  },
+  "success": true,
+  "error": null
+}

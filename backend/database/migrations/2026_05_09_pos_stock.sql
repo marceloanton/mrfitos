@@ -1,0 +1,5 @@
+USE gymsaas;
+
+ALTER TABLE pos_products
+    ADD COLUMN IF NOT EXISTS track_stock TINYINT(1) NOT NULL DEFAULT 1 AFTER currency,
+    ADD COLUMN IF NOT EXISTS stock_qty DECIMAL(12,3) NOT NULL DEFAULT 0 AFTER track_stock;

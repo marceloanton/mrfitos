@@ -1,0 +1,585 @@
+<?php
+
+namespace App\Services;
+
+use App\Repositories\PosRepository;
+use Core\Database;
+use Core\Env;
+
+final class PosService
+{
+    private const SETTING_REQUIRE_OPEN_CASH = 'pos.require_open_cash';
+
+    public function __construct(private readonly PosRepository $repo = new PosRepository())
+    {
+    }
+
+    public function listProducts(int $tenantId, int $gymId): array
+    {
+        return $this->repo->listProducts($tenantId, $gymId);
+    }
+
+    public function getSummary(int $tenantId, int $gymId): array
+    {
+        return $this->repo->getSummary($tenantId, $gymId);
+    }
+
+    public function createProduct(int $tenantId, int $gymId, array $input): int
+    {
+        $name = trim((string) ($input['name'] ?? ''));
+        $code = trim((string) ($input['code'] ?? ''));
+        $price = (float) ($input['price'] ?? 0);
+        if ($name === '' || $code === '' || $price <= 0) {
+            throw new \InvalidArgumentException('name, code and price are required');
+        }
+
+        $currency = strtoupper(trim((string) ($input['currency'] ?? 'ARS')));
+        if (!preg_match('/^[A-Z]{3}$/', $currency)) {
+            throw new \InvalidArgumentException('currency must be a 3-letter ISO code');
+        }
+
+        return $this->repo->createProduct([
+            'tenant_id' => $tenantId,
+            'gym_id' => $gymId,
+            'code' => substr($code, 0, 60),
+            'name' => substr($name, 0, 150),
+            'price' => $price,
+            'currency' => $currency,
+            'track_stock' => array_key_exists('track_stock', $input) ? (!empty($input['track_stock']) ? 1 : 0) : 1,
+            'stock_qty' => max(0, (float) ($input['stock_qty'] ?? 0)),
+            'is_active' => !empty($input['is_active']) ? 1 : 0
+        ]);
+    }
+
+    public function listSales(int $tenantId, int $gymId, int $page, int $perPage): array
+    {
+        return $this->repo->listSales($tenantId, $gymId, $page, $perPage);
+    }
+
+    public function getSaleReceipt(int $tenantId, int $gymId, int $saleId): array
+    {
+        if ($saleId <= 0) {
+            throw new \InvalidArgumentException('Invalid sale id');
+        }
+
+        $sale = $this->repo->findSaleById($tenantId, $gymId, $saleId);
+        if (!$sale) {
+            throw new \InvalidArgumentException('Sale not found');
+        }
+
+        $items = $this->repo->listSaleItems($tenantId, $gymId, $saleId);
+        $normalizedItems = array_map(static fn (array $item): array => [
+            'item_name' => (string) ($item['item_name'] ?? ''),
+            'qty' => (float) ($item['qty'] ?? 0),
+            'unit_price' => (float) ($item['unit_price'] ?? 0),
+            'line_total' => (float) ($item['line_total'] ?? 0)
+        ], $items);
+
+        $payment = null;
+        $paymentId = isset($sale['payment_id']) ? (int) $sale['payment_id'] : 0;
+        if ($paymentId > 0) {
+            $paymentRow = $this->repo->findPaymentById($tenantId, $gymId, $paymentId);
+            if ($paymentRow) {
+                $payment = [
+                    'method' => (string) ($paymentRow['method'] ?? ''),
+                    'amount' => (float) ($paymentRow['amount'] ?? 0),
+                    'paid_at' => $paymentRow['paid_at'] ?? null,
+                ];
+            }
+        }
+
+        return [
+            'sale' => [
+                'id' => (int) $sale['id'],
+                'created_at' => (string) ($sale['created_at'] ?? ''),
+                'charge_mode' => (string) ($sale['charge_mode'] ?? ''),
+                'total_amount' => (float) ($sale['total_amount'] ?? 0),
+                'currency' => (string) ($sale['currency'] ?? 'ARS'),
+                'notes' => $sale['notes'] ?? null,
+            ],
+            'member' => [
+                'member_code' => $sale['member_code'] ?? null,
+                'first_name' => $sale['first_name'] ?? null,
+                'last_name' => $sale['last_name'] ?? null,
+            ],
+            'items' => $normalizedItems,
+            'payment' => $payment,
+        ];
+    }
+
+    public function createSale(int $tenantId, int $gymId, int $userId, array $input): array
+    {
+        $requireOpenCash = $this->getRequireOpenCash($tenantId, $gymId);
+        if ($requireOpenCash) {
+            $openCash = $this->repo->findOpenCashSession($tenantId, $gymId);
+            if (!$openCash) {
+                throw new \InvalidArgumentException('No open cash session. Open cash before creating POS sales.');
+            }
+        }
+
+        $memberId = isset($input['member_id']) ? (int) $input['member_id'] : null;
+        $chargeMode = (string) ($input['charge_mode'] ?? '');
+        if (!in_array($chargeMode, ['immediate', 'cash', 'member_account'], true)) {
+            throw new \InvalidArgumentException('Invalid charge_mode');
+        }
+
+        $items = is_array($input['items'] ?? null) ? $input['items'] : [];
+        if (count($items) === 0) {
+            throw new \InvalidArgumentException('At least one item is required');
+        }
+
+        if ($chargeMode === 'member_account' && (!$memberId || $memberId <= 0)) {
+            throw new \InvalidArgumentException('member_id is required for member_account charge mode');
+        }
+
+        $currency = strtoupper(trim((string) ($input['currency'] ?? 'ARS')));
+        if (!preg_match('/^[A-Z]{3}$/', $currency)) {
+            throw new \InvalidArgumentException('currency must be a 3-letter ISO code');
+        }
+
+        $normalizedItems = [];
+        $total = 0.0;
+        foreach ($items as $item) {
+            $productId = isset($item['product_id']) ? (int) $item['product_id'] : null;
+            $qty = (float) ($item['qty'] ?? 1);
+            $name = trim((string) ($item['item_name'] ?? $item['name'] ?? ''));
+            $unitPrice = (float) ($item['unit_price'] ?? $item['price'] ?? 0);
+
+            if ($productId && $productId > 0) {
+                $product = $this->repo->findProductById($tenantId, $gymId, $productId);
+                if (!$product || (int) ($product['is_active'] ?? 0) !== 1) {
+                    throw new \InvalidArgumentException('Product not found or inactive');
+                }
+                $name = (string) ($product['name'] ?? $name);
+                $unitPrice = (float) ($product['price'] ?? $unitPrice);
+                if ((int) ($product['track_stock'] ?? 0) === 1) {
+                    $stock = (float) ($product['stock_qty'] ?? 0);
+                    if ($stock < $qty) {
+                        throw new \InvalidArgumentException('Insufficient stock for product: ' . $name);
+                    }
+                }
+            }
+
+            if ($name === '' || $qty <= 0 || $unitPrice < 0) {
+                throw new \InvalidArgumentException('Invalid item payload');
+            }
+            $lineTotal = round($qty * $unitPrice, 2);
+            $total += $lineTotal;
+            $normalizedItems[] = [
+                'product_id' => $productId,
+                'item_name' => substr($name, 0, 150),
+                'qty' => $qty,
+                'unit_price' => $unitPrice,
+                'line_total' => $lineTotal
+            ];
+        }
+        $total = round($total, 2);
+        if ($total <= 0) {
+            throw new \InvalidArgumentException('Sale total must be greater than zero');
+        }
+
+        $paymentMethod = (string) ($input['payment_method'] ?? ($chargeMode === 'cash' ? 'cash' : 'transfer'));
+        if (!in_array($paymentMethod, ['cash', 'card', 'transfer', 'mercadopago', 'other'], true)) {
+            throw new \InvalidArgumentException('Invalid payment_method');
+        }
+
+        $conn = Database::connection();
+        $conn->beginTransaction();
+        try {
+            $paymentId = null;
+            if ($chargeMode !== 'member_account') {
+                if (!$memberId || $memberId <= 0) {
+                    throw new \InvalidArgumentException('member_id is required for immediate/cash charge modes');
+                }
+                $paymentId = $this->repo->createPayment([
+                    'tenant_id' => $tenantId,
+                    'gym_id' => $gymId,
+                    'member_id' => $memberId,
+                    'received_by_user_id' => $userId > 0 ? $userId : null,
+                    'amount' => $total,
+                    'currency' => $currency,
+                    'method' => $chargeMode === 'cash' ? 'cash' : $paymentMethod,
+                    'paid_at' => date('Y-m-d H:i:s'),
+                    'notes' => trim((string) ($input['notes'] ?? '')) ?: 'POS sale'
+                ]);
+            }
+
+            $saleId = $this->repo->createSale([
+                'tenant_id' => $tenantId,
+                'gym_id' => $gymId,
+                'member_id' => $memberId > 0 ? $memberId : null,
+                'sold_by_user_id' => $userId > 0 ? $userId : null,
+                'total_amount' => $total,
+                'currency' => $currency,
+                'charge_mode' => $chargeMode,
+                'payment_id' => $paymentId,
+                'notes' => trim((string) ($input['notes'] ?? '')) ?: null
+            ]);
+
+            foreach ($normalizedItems as $item) {
+                $this->repo->createSaleItem([
+                    'sale_id' => $saleId,
+                    'tenant_id' => $tenantId,
+                    'gym_id' => $gymId,
+                    'product_id' => $item['product_id'],
+                    'item_name' => $item['item_name'],
+                    'qty' => $item['qty'],
+                    'unit_price' => $item['unit_price'],
+                    'line_total' => $item['line_total'],
+                ]);
+
+                if (!empty($item['product_id'])) {
+                    $product = $this->repo->findProductById($tenantId, $gymId, (int) $item['product_id']);
+                    if ($product && (int) ($product['track_stock'] ?? 0) === 1) {
+                        $ok = $this->repo->decrementStock($tenantId, $gymId, (int) $item['product_id'], (float) $item['qty']);
+                        if (!$ok) {
+                            throw new \InvalidArgumentException('Stock changed during sale. Please retry.');
+                        }
+                        $updated = $this->repo->findProductById($tenantId, $gymId, (int) $item['product_id']);
+                        $this->repo->createStockMovement([
+                            'tenant_id' => $tenantId,
+                            'gym_id' => $gymId,
+                            'product_id' => (int) $item['product_id'],
+                            'movement_type' => 'out',
+                            'qty' => (float) $item['qty'],
+                            'balance_after' => (float) ($updated['stock_qty'] ?? 0),
+                            'reference_type' => 'sale',
+                            'reference_id' => $saleId,
+                            'created_by_user_id' => $userId > 0 ? $userId : null,
+                            'notes' => 'POS sale output'
+                        ]);
+                    }
+                }
+            }
+
+            $accountChargeId = null;
+            if ($chargeMode === 'member_account') {
+                $dueDateRaw = trim((string) ($input['due_date'] ?? ''));
+                $accountChargeId = $this->repo->createMemberAccountCharge([
+                    'tenant_id' => $tenantId,
+                    'gym_id' => $gymId,
+                    'member_id' => $memberId,
+                    'sale_id' => $saleId,
+                    'amount' => $total,
+                    'currency' => $currency,
+                    'due_date' => $dueDateRaw !== '' ? $dueDateRaw : null,
+                    'notes' => trim((string) ($input['notes'] ?? '')) ?: null
+                ]);
+            }
+
+            $conn->commit();
+            return [
+                'sale_id' => $saleId,
+                'payment_id' => $paymentId,
+                'member_account_charge_id' => $accountChargeId,
+                'total_amount' => $total,
+                'currency' => $currency,
+                'charge_mode' => $chargeMode
+            ];
+        } catch (\Throwable $e) {
+            if ($conn->inTransaction()) {
+                $conn->rollBack();
+            }
+            throw $e;
+        }
+    }
+
+    public function listMemberAccountCharges(int $tenantId, int $gymId, string $status, int $page, int $perPage): array
+    {
+        return $this->repo->listMemberAccountCharges($tenantId, $gymId, $status, $page, $perPage);
+    }
+
+    public function settleMemberAccountCharge(int $tenantId, int $gymId, int $userId, int $chargeId, array $input): array
+    {
+        $charge = $this->repo->findPendingChargeById($tenantId, $gymId, $chargeId);
+        if (!$charge) {
+            throw new \InvalidArgumentException('Charge not found');
+        }
+        if ((string) ($charge['status'] ?? '') !== 'pending_auto_debit') {
+            throw new \InvalidArgumentException('Charge is not pending auto debit');
+        }
+
+        $method = (string) ($input['method'] ?? 'transfer');
+        if (!in_array($method, ['cash', 'card', 'transfer', 'mercadopago', 'other'], true)) {
+            throw new \InvalidArgumentException('Invalid payment method');
+        }
+
+        $conn = Database::connection();
+        $conn->beginTransaction();
+        try {
+            $paymentId = $this->repo->createPayment([
+                'tenant_id' => $tenantId,
+                'gym_id' => $gymId,
+                'member_id' => (int) $charge['member_id'],
+                'received_by_user_id' => $userId > 0 ? $userId : null,
+                'amount' => (float) $charge['amount'],
+                'currency' => (string) $charge['currency'],
+                'method' => $method,
+                'paid_at' => date('Y-m-d H:i:s'),
+                'notes' => trim((string) ($input['notes'] ?? '')) ?: 'Auto-debit settlement'
+            ]);
+            $this->repo->settleMemberAccountCharge($tenantId, $gymId, $chargeId, $paymentId);
+            $conn->commit();
+            return [
+                'charge_id' => $chargeId,
+                'payment_id' => $paymentId,
+                'status' => 'settled'
+            ];
+        } catch (\Throwable $e) {
+            if ($conn->inTransaction()) {
+                $conn->rollBack();
+            }
+            throw $e;
+        }
+    }
+
+    public function adjustStock(int $tenantId, int $gymId, int $userId, array $input): array
+    {
+        $productId = (int) ($input['product_id'] ?? 0);
+        $movementType = (string) ($input['movement_type'] ?? 'adjustment');
+        $qty = (float) ($input['qty'] ?? 0);
+        if ($productId <= 0 || $qty <= 0) {
+            throw new \InvalidArgumentException('product_id and qty are required');
+        }
+        if (!in_array($movementType, ['in', 'out', 'adjustment'], true)) {
+            throw new \InvalidArgumentException('Invalid movement_type');
+        }
+
+        $product = $this->repo->findProductById($tenantId, $gymId, $productId);
+        if (!$product) {
+            throw new \InvalidArgumentException('Product not found');
+        }
+        if ((int) ($product['track_stock'] ?? 0) !== 1) {
+            throw new \InvalidArgumentException('Product does not track stock');
+        }
+
+        $conn = Database::connection();
+        $conn->beginTransaction();
+        try {
+            if ($movementType === 'in') {
+                $ok = $this->repo->incrementStock($tenantId, $gymId, $productId, $qty);
+                if (!$ok) throw new \InvalidArgumentException('Unable to increment stock');
+            } elseif ($movementType === 'out') {
+                $ok = $this->repo->decrementStock($tenantId, $gymId, $productId, $qty);
+                if (!$ok) throw new \InvalidArgumentException('Insufficient stock');
+            } else {
+                $ok = $this->repo->setStock($tenantId, $gymId, $productId, $qty);
+                if (!$ok) throw new \InvalidArgumentException('Unable to set stock');
+            }
+
+            $updated = $this->repo->findProductById($tenantId, $gymId, $productId);
+            $movementId = $this->repo->createStockMovement([
+                'tenant_id' => $tenantId,
+                'gym_id' => $gymId,
+                'product_id' => $productId,
+                'movement_type' => $movementType,
+                'qty' => $qty,
+                'balance_after' => (float) ($updated['stock_qty'] ?? 0),
+                'reference_type' => 'manual',
+                'reference_id' => null,
+                'created_by_user_id' => $userId > 0 ? $userId : null,
+                'notes' => trim((string) ($input['notes'] ?? '')) ?: null
+            ]);
+
+            $conn->commit();
+            return [
+                'movement_id' => $movementId,
+                'product_id' => $productId,
+                'movement_type' => $movementType,
+                'balance_after' => (float) ($updated['stock_qty'] ?? 0),
+            ];
+        } catch (\Throwable $e) {
+            if ($conn->inTransaction()) {
+                $conn->rollBack();
+            }
+            throw $e;
+        }
+    }
+
+    public function listStockMovements(int $tenantId, int $gymId, ?int $productId, int $page, int $perPage): array
+    {
+        return $this->repo->listStockMovements($tenantId, $gymId, $productId, $page, $perPage);
+    }
+
+    public function openCashSession(int $tenantId, int $gymId, int $userId, array $input): array
+    {
+        $existing = $this->repo->findOpenCashSession($tenantId, $gymId);
+        if ($existing) {
+            throw new \InvalidArgumentException('There is already an open cash session');
+        }
+        $openingAmount = (float) ($input['opening_amount'] ?? 0);
+        if ($openingAmount < 0) {
+            throw new \InvalidArgumentException('opening_amount must be >= 0');
+        }
+
+        $sessionId = $this->repo->createCashSession([
+            'tenant_id' => $tenantId,
+            'gym_id' => $gymId,
+            'opened_by_user_id' => $userId,
+            'opening_amount' => $openingAmount,
+            'notes' => trim((string) ($input['notes'] ?? '')) ?: null
+        ]);
+
+        return [
+            'cash_session_id' => $sessionId,
+            'status' => 'open',
+            'opening_amount' => $openingAmount
+        ];
+    }
+
+    public function getOpenCashSessionSummary(int $tenantId, int $gymId): array
+    {
+        $session = $this->repo->findOpenCashSession($tenantId, $gymId);
+        if (!$session) {
+            return ['open' => false];
+        }
+
+        $cashCollected = $this->repo->sumCashCollectedSince($tenantId, $gymId, (string) $session['opened_at']);
+        $expected = (float) $session['opening_amount'] + $cashCollected;
+        return [
+            'open' => true,
+            'session_id' => (int) $session['id'],
+            'opened_at' => (string) $session['opened_at'],
+            'opening_amount' => (float) $session['opening_amount'],
+            'cash_collected' => $cashCollected,
+            'expected_amount' => $expected
+        ];
+    }
+
+    public function closeCashSession(int $tenantId, int $gymId, int $userId, array $input): array
+    {
+        $session = $this->repo->findOpenCashSession($tenantId, $gymId);
+        if (!$session) {
+            throw new \InvalidArgumentException('No open cash session');
+        }
+        $closingAmount = (float) ($input['closing_amount'] ?? 0);
+        if ($closingAmount < 0) {
+            throw new \InvalidArgumentException('closing_amount must be >= 0');
+        }
+
+        $cashCollected = $this->repo->sumCashCollectedSince($tenantId, $gymId, (string) $session['opened_at']);
+        $expected = (float) $session['opening_amount'] + $cashCollected;
+        $difference = round($closingAmount - $expected, 2);
+
+        $ok = $this->repo->closeCashSession([
+            'id' => (int) $session['id'],
+            'tenant_id' => $tenantId,
+            'gym_id' => $gymId,
+            'closed_by_user_id' => $userId,
+            'expected_amount' => $expected,
+            'closing_amount' => $closingAmount,
+            'difference_amount' => $difference,
+            'notes' => trim((string) ($input['notes'] ?? '')) ?: null
+        ]);
+        if (!$ok) {
+            throw new \InvalidArgumentException('Unable to close cash session');
+        }
+
+        return [
+            'cash_session_id' => (int) $session['id'],
+            'status' => 'closed',
+            'opening_amount' => (float) $session['opening_amount'],
+            'cash_collected' => $cashCollected,
+            'expected_amount' => $expected,
+            'closing_amount' => $closingAmount,
+            'difference_amount' => $difference
+        ];
+    }
+
+    public function listCashSessions(int $tenantId, int $gymId, int $page, int $perPage): array
+    {
+        return $this->repo->listCashSessions($tenantId, $gymId, $page, $perPage);
+    }
+
+    public function getCashSessionReport(int $tenantId, int $gymId, int $cashSessionId): array
+    {
+        if ($cashSessionId <= 0) {
+            throw new \InvalidArgumentException('Invalid cash session id');
+        }
+
+        $session = $this->repo->findCashSessionById($tenantId, $gymId, $cashSessionId);
+        if (!$session) {
+            throw new \InvalidArgumentException('Cash session not found');
+        }
+
+        $fromDateTime = (string) ($session['opened_at'] ?? '');
+        if ($fromDateTime === '') {
+            throw new \InvalidArgumentException('Cash session has invalid opened_at');
+        }
+        $toDateTime = (string) ($session['closed_at'] ?? '');
+        if ($toDateTime === '') {
+            $toDateTime = date('Y-m-d H:i:s');
+        }
+
+        $paymentsByMethodRows = $this->repo->sumPaymentsByMethodInRange($tenantId, $gymId, $fromDateTime, $toDateTime);
+        $paymentsByMethod = [];
+        $paymentsTotal = 0.0;
+        foreach ($paymentsByMethodRows as $row) {
+            $method = (string) ($row['method'] ?? 'other');
+            $amount = (float) ($row['total_amount'] ?? 0);
+            $paymentsByMethod[$method] = $amount;
+            $paymentsTotal += $amount;
+        }
+
+        $salesTotals = $this->repo->getPosSalesTotalsInRange($tenantId, $gymId, $fromDateTime, $toDateTime);
+        $memberAccountSummary = $this->repo->getSettledMemberAccountSummaryInRange($tenantId, $gymId, $fromDateTime, $toDateTime);
+
+        return [
+            'cash_session' => [
+                'id' => (int) $session['id'],
+                'status' => (string) ($session['status'] ?? ''),
+                'opening_amount' => (float) ($session['opening_amount'] ?? 0),
+                'expected_amount' => isset($session['expected_amount']) ? (float) $session['expected_amount'] : null,
+                'closing_amount' => isset($session['closing_amount']) ? (float) $session['closing_amount'] : null,
+                'difference_amount' => isset($session['difference_amount']) ? (float) $session['difference_amount'] : null,
+                'opened_at' => (string) ($session['opened_at'] ?? ''),
+                'closed_at' => $session['closed_at'] ?? null,
+                'notes' => $session['notes'] ?? null,
+            ],
+            'range' => [
+                'from' => $fromDateTime,
+                'to' => $toDateTime
+            ],
+            'payments' => [
+                'by_method' => $paymentsByMethod,
+                'total' => round($paymentsTotal, 2)
+            ],
+            'pos_sales' => [
+                'count' => (int) ($salesTotals['sales_count'] ?? 0),
+                'total' => (float) ($salesTotals['sales_total'] ?? 0)
+            ],
+            'member_account_settlements' => [
+                'count' => (int) ($memberAccountSummary['settled_count'] ?? 0),
+                'total' => (float) ($memberAccountSummary['settled_total'] ?? 0)
+            ]
+        ];
+    }
+
+    public function getPosConfig(int $tenantId, int $gymId): array
+    {
+        return [
+            'require_open_cash' => $this->getRequireOpenCash($tenantId, $gymId)
+        ];
+    }
+
+    public function updatePosConfig(int $tenantId, int $gymId, array $input): array
+    {
+        if (!array_key_exists('require_open_cash', $input) || !is_bool($input['require_open_cash'])) {
+            throw new \InvalidArgumentException('require_open_cash must be boolean');
+        }
+        $value = (bool) $input['require_open_cash'];
+        $this->repo->upsertSetting($tenantId, $gymId, self::SETTING_REQUIRE_OPEN_CASH, $value ? '1' : '0');
+        return [
+            'require_open_cash' => $value
+        ];
+    }
+
+    private function getRequireOpenCash(int $tenantId, int $gymId): bool
+    {
+        $stored = $this->repo->getSetting($tenantId, $gymId, self::SETTING_REQUIRE_OPEN_CASH);
+        if ($stored !== null) {
+            return $stored === '1' || strtolower($stored) === 'true';
+        }
+        return filter_var((string) Env::get('POS_REQUIRE_OPEN_CASH', '1'), FILTER_VALIDATE_BOOL);
+    }
+}

@@ -1,0 +1,17 @@
+{
+    "mode":  "smoke",
+    "timestamp":  "2026-05-07T15:51:45.3154026-03:00",
+    "api_base_url":  "http://localhost:8080",
+    "steps":  {
+                  "health":  "ok",
+                  "login":  "ok",
+                  "auth_me":  "ok",
+                  "dashboard":  "ok",
+                  "members":  "ok",
+                  "attendance":  "ok",
+                  "reminders":  "ok",
+                  "reports":  "ok"
+              },
+    "success":  true,
+    "error":  null
+}
