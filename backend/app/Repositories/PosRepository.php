@@ -1439,7 +1439,7 @@ final class PosRepository
     public function findPendingChargeById(int $tenantId, int $gymId, int $chargeId): ?array
     {
         $stmt = Database::connection()->prepare(
-            'SELECT id, member_id, amount, currency, status
+            'SELECT id, member_id, sale_id, amount, currency, status
              FROM member_account_charges
              WHERE id = :id AND tenant_id = :tenant_id AND gym_id = :gym_id
              LIMIT 1'
@@ -1447,6 +1447,25 @@ final class PosRepository
         $stmt->execute(['id' => $chargeId, 'tenant_id' => $tenantId, 'gym_id' => $gymId]);
         $row = $stmt->fetch();
         return $row ?: null;
+    }
+
+    public function listPendingDueMemberAccountCharges(int $tenantId, int $gymId, int $limit): array
+    {
+        $stmt = Database::connection()->prepare(
+            'SELECT id, member_id, sale_id, amount, currency, status, due_date
+             FROM member_account_charges
+             WHERE tenant_id = :tenant_id
+               AND gym_id = :gym_id
+               AND status = "pending_auto_debit"
+               AND due_date <= CURDATE()
+             ORDER BY due_date ASC, id ASC
+             LIMIT :limit'
+        );
+        $stmt->bindValue(':tenant_id', $tenantId, \PDO::PARAM_INT);
+        $stmt->bindValue(':gym_id', $gymId, \PDO::PARAM_INT);
+        $stmt->bindValue(':limit', $limit, \PDO::PARAM_INT);
+        $stmt->execute();
+        return $stmt->fetchAll() ?: [];
     }
 
     public function createPayment(array $data): int

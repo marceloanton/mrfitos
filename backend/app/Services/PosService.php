@@ -467,6 +467,10 @@ final class PosService
                 'notes' => trim((string) ($input['notes'] ?? '')) ?: 'Auto-debit settlement'
             ]);
             $this->repo->settleMemberAccountCharge($tenantId, $gymId, $chargeId, $paymentId);
+            $saleId = (int) ($charge['sale_id'] ?? 0);
+            if ($saleId > 0) {
+                $this->repo->updateSalePayment($tenantId, $gymId, $saleId, $paymentId);
+            }
             $conn->commit();
             return [
                 'charge_id' => $chargeId,
@@ -479,6 +483,76 @@ final class PosService
             }
             throw $e;
         }
+    }
+
+    public function settlePendingMemberAccountCharges(int $tenantId, int $gymId, int $limit, string $method = 'transfer'): array
+    {
+        if ($limit <= 0) {
+            throw new \InvalidArgumentException('limit must be > 0');
+        }
+        if ($limit > 500) {
+            throw new \InvalidArgumentException('limit must be <= 500');
+        }
+        if (!in_array($method, ['cash', 'card', 'transfer', 'mercadopago', 'other'], true)) {
+            throw new \InvalidArgumentException('Invalid payment method');
+        }
+
+        $pending = $this->repo->listPendingDueMemberAccountCharges($tenantId, $gymId, $limit);
+        $processed = count($pending);
+        $settled = 0;
+        $failed = 0;
+        $failures = [];
+
+        foreach ($pending as $charge) {
+            $chargeId = (int) ($charge['id'] ?? 0);
+            if ($chargeId <= 0) {
+                continue;
+            }
+
+            $conn = Database::connection();
+            $conn->beginTransaction();
+            try {
+                $paymentId = $this->repo->createPayment([
+                    'tenant_id' => $tenantId,
+                    'gym_id' => $gymId,
+                    'member_id' => (int) ($charge['member_id'] ?? 0),
+                    'received_by_user_id' => null,
+                    'amount' => (float) ($charge['amount'] ?? 0),
+                    'currency' => (string) ($charge['currency'] ?? 'ARS'),
+                    'method' => $method,
+                    'paid_at' => date('Y-m-d H:i:s'),
+                    'notes' => sprintf('Auto-debit batch settlement (charge #%d)', $chargeId),
+                ]);
+                $ok = $this->repo->settleMemberAccountCharge($tenantId, $gymId, $chargeId, $paymentId);
+                if (!$ok) {
+                    throw new \RuntimeException('Charge no longer pending');
+                }
+                $saleId = (int) ($charge['sale_id'] ?? 0);
+                if ($saleId > 0) {
+                    $this->repo->updateSalePayment($tenantId, $gymId, $saleId, $paymentId);
+                }
+                $conn->commit();
+                $settled++;
+            } catch (\Throwable $e) {
+                if ($conn->inTransaction()) {
+                    $conn->rollBack();
+                }
+                $failed++;
+                $failures[] = [
+                    'charge_id' => $chargeId,
+                    'message' => $e->getMessage(),
+                ];
+            }
+        }
+
+        return [
+            'tenant_id' => $tenantId,
+            'gym_id' => $gymId,
+            'processed' => $processed,
+            'settled' => $settled,
+            'failed' => $failed,
+            'failures' => $failures,
+        ];
     }
 
     public function adjustStock(int $tenantId, int $gymId, int $userId, array $input): array

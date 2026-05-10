@@ -163,6 +163,7 @@ $router->add('POST', '/admin/subscription/process-expired-trials', [AdminSubscri
 $router->add('POST', '/cron/subscription/process-expired-trials', [AdminSubscriptionController::class, 'processExpiredTrials'], [new RateLimitMiddleware('cron_trials', 30, 60), CronTokenMiddleware::class]);
 $router->add('POST', '/cron/billing/conversion-alert', [BillingController::class, 'cronConversionAlert'], [new RateLimitMiddleware('cron_billing_alert', 30, 60), CronTokenMiddleware::class]);
 $router->add('POST', '/cron/pos/alerts/dispatch', [PosController::class, 'dispatchCriticalAlertsCron'], [new RateLimitMiddleware('cron_pos_alert_dispatch', 30, 60), CronTokenMiddleware::class]);
+$router->add('POST', '/cron/pos/member-account/auto-settle', [PosController::class, 'autoSettleMemberAccountCron'], [new RateLimitMiddleware('cron_pos_member_account_autosettle', 30, 60), CronTokenMiddleware::class]);
 $router->add('GET', '/admin/addons/tenant/{tenant_id}', [AdminAddonController::class, 'showTenantAddons'], [AuthMiddleware::class, new PermissionMiddleware('subscriptions.manage')]);
 $router->add('PUT', '/admin/addons/tenant/{tenant_id}/{addon_code}', [AdminAddonController::class, 'updateTenantAddon'], [AuthMiddleware::class, new PermissionMiddleware('subscriptions.manage')]);
 $router->add('GET', '/admin/addons/catalog', [AdminAddonController::class, 'catalog'], [AuthMiddleware::class, new PermissionMiddleware('subscriptions.manage.catalog')]);

@@ -595,6 +595,90 @@ final class PosController
         }
     }
 
+    public function autoSettleMemberAccountCron(): void
+    {
+        try {
+            $input = Request::json();
+            $mode = strtolower(trim((string) ($input['mode'] ?? 'single')));
+            $limit = (int) ($input['limit'] ?? 100);
+            $method = strtolower(trim((string) ($input['method'] ?? 'transfer')));
+
+            if ($mode === 'single') {
+                $tenantId = (int) ($input['tenant_id'] ?? 0);
+                $gymId = (int) ($input['gym_id'] ?? 0);
+                if ($tenantId <= 0 || $gymId <= 0) {
+                    Response::json(['success' => false, 'message' => 'tenant_id and gym_id are required in single mode'], 422);
+                    return;
+                }
+
+                $data = $this->service->settlePendingMemberAccountCharges($tenantId, $gymId, $limit, $method);
+                Response::json([
+                    'success' => true,
+                    'message' => 'POS member account auto-settlement executed',
+                    'data' => $data,
+                ]);
+                return;
+            }
+
+            if ($mode !== 'bulk') {
+                Response::json(['success' => false, 'message' => 'Invalid mode. Use single or bulk'], 422);
+                return;
+            }
+
+            $scopes = $this->service->listActiveTenantGymScopes();
+            $items = [];
+            $totals = [
+                'processed' => 0,
+                'settled' => 0,
+                'failed' => 0,
+            ];
+
+            foreach ($scopes as $scope) {
+                $tenantId = (int) ($scope['tenant_id'] ?? 0);
+                $gymId = (int) ($scope['gym_id'] ?? 0);
+                if ($tenantId <= 0 || $gymId <= 0) {
+                    continue;
+                }
+
+                try {
+                    $result = $this->service->settlePendingMemberAccountCharges($tenantId, $gymId, $limit, $method);
+                    $items[] = $result;
+                    $totals['processed'] += (int) ($result['processed'] ?? 0);
+                    $totals['settled'] += (int) ($result['settled'] ?? 0);
+                    $totals['failed'] += (int) ($result['failed'] ?? 0);
+                } catch (\Throwable $e) {
+                    $items[] = [
+                        'tenant_id' => $tenantId,
+                        'gym_id' => $gymId,
+                        'processed' => 0,
+                        'settled' => 0,
+                        'failed' => 1,
+                        'failures' => [[
+                            'charge_id' => null,
+                            'message' => $e->getMessage(),
+                        ]],
+                    ];
+                    $totals['failed']++;
+                }
+            }
+
+            Response::json([
+                'success' => true,
+                'message' => 'POS member account auto-settlement bulk executed',
+                'data' => [
+                    'mode' => 'bulk',
+                    'scope_count' => count($items),
+                    'totals' => $totals,
+                    'items' => $items,
+                ],
+            ]);
+        } catch (\InvalidArgumentException $e) {
+            Response::json(['success' => false, 'message' => $e->getMessage()], 422);
+        } catch (\Throwable $e) {
+            Response::json(['success' => false, 'message' => 'Failed to run POS member account auto-settlement cron'], 500);
+        }
+    }
+
     public function alertContacts(): void
     {
         $auth = json_decode($_SERVER['auth_user'] ?? '{}', true) ?: [];
