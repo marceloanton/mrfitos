@@ -130,8 +130,26 @@ export default function PosPage() {
     }
     return apiMessage || fallbackMessage;
   };
+  const isRangeWithin92Days = (from, to) => {
+    if (!from || !to) return true;
+    const fromTime = new Date(`${from}T00:00:00`).getTime();
+    const toTime = new Date(`${to}T00:00:00`).getTime();
+    if (Number.isNaN(fromTime) || Number.isNaN(toTime)) return true;
+    const rangeDays = Math.floor((toTime - fromTime) / 86400000) + 1;
+    return rangeDays <= 92;
+  };
+  const validateFollowupRange = () => {
+    if (!isRangeWithin92Days(followupDateFrom, followupDateTo)) {
+      setError('El rango de fechas no puede superar 92 días.');
+      return false;
+    }
+    return true;
+  };
 
   const load = async () => {
+    if (!validateFollowupRange()) {
+      return;
+    }
     try {
       const [salesData, chargesData, productsData, movementsData, openCashData, cashSessionsData, posConfig, summaryData, lowStockData, cashByOperatorData, auditData, alertsData, contactsData, dispatchHistoryData, alertsStatusData, alertsCronHistoryData, autosettleKpiData, memberAccountAgingData, collectionsKpiData, followupFunnelData, promiseAgendaData, contactEffectivenessData, collectorRankingData] = await Promise.all([
         listPosSales({ page: 1, per_page: 20 }),
@@ -855,6 +873,9 @@ ${sale.notes ? `Nota: ${sale.notes}` : ''}
 
   const onExportContactEffectivenessCsv = async () => {
     setError('');
+    if (!validateFollowupRange()) {
+      return;
+    }
     try {
       const blob = await exportMemberAccountContactEffectivenessCsv({
         date_from: followupDateFrom || undefined,
@@ -873,6 +894,9 @@ ${sale.notes ? `Nota: ${sale.notes}` : ''}
 
   const onExportCollectorRankingCsv = async () => {
     setError('');
+    if (!validateFollowupRange()) {
+      return;
+    }
     try {
       const blob = await exportMemberAccountCollectorRankingCsv({
         date_from: followupDateFrom || undefined,
