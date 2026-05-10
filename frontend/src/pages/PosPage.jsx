@@ -123,6 +123,13 @@ export default function PosPage() {
     today_cash_collected: 0,
     pending_member_account_total: 0
   });
+  const toFriendlyApiError = (err, fallbackMessage) => {
+    const apiMessage = err?.response?.data?.message;
+    if (apiMessage === 'date range must be <= 92 days') {
+      return 'El rango de fechas no puede superar 92 días.';
+    }
+    return apiMessage || fallbackMessage;
+  };
 
   const load = async () => {
     try {
@@ -248,8 +255,8 @@ export default function PosPage() {
       });
       setCollectorRanking(Array.isArray(collectorRankingData?.items) ? collectorRankingData.items : []);
       setCollectorCommissionRules(collectorRankingData?.commission_rules ?? null);
-    } catch {
-      // no-op
+    } catch (err) {
+      setError(toFriendlyApiError(err, 'No se pudieron actualizar los indicadores de seguimiento.'));
     }
   };
 
@@ -860,7 +867,7 @@ ${sale.notes ? `Nota: ${sale.notes}` : ''}
       a.click();
       window.URL.revokeObjectURL(url);
     } catch (err) {
-      setError(err?.response?.data?.message ?? 'No se pudo exportar efectividad de contacto.');
+      setError(toFriendlyApiError(err, 'No se pudo exportar efectividad de contacto.'));
     }
   };
 
@@ -878,7 +885,7 @@ ${sale.notes ? `Nota: ${sale.notes}` : ''}
       a.click();
       window.URL.revokeObjectURL(url);
     } catch (err) {
-      setError(err?.response?.data?.message ?? 'No se pudo exportar ranking de cobradores.');
+      setError(toFriendlyApiError(err, 'No se pudo exportar ranking de cobradores.'));
     }
   };
 
