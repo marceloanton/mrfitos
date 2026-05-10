@@ -640,6 +640,7 @@ final class PosService
         $topCollector = $items[0] ?? null;
         $avgRecoveredPerCollector = $collectorsCount > 0 ? round($totalRecoveredAmount / $collectorsCount, 2) : 0.0;
         $commissionOverRecoveredRate = $totalRecoveredAmount > 0 ? round(($totalCommissionAmount / $totalRecoveredAmount) * 100, 2) : 0.0;
+        $topCollectorSortValue = $topCollector !== null ? (float) ($topCollector[$sortBy] ?? 0) : 0.0;
 
         return [
             'date_from' => $dateFrom,
@@ -658,6 +659,8 @@ final class PosService
                 'top_collector_user_id' => (int) ($topCollector['user_id'] ?? 0),
                 'top_collector_name' => (string) ($topCollector['user_name'] ?? ''),
                 'top_collector_recovered_amount' => (float) ($topCollector['recovered_amount'] ?? 0),
+                'top_collector_sort_metric' => $sortBy,
+                'top_collector_sort_value' => $topCollectorSortValue,
             ],
             'items' => $items,
         ];

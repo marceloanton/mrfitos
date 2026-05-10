@@ -128,7 +128,9 @@ export default function PosPage() {
     commission_over_recovered_rate: 0,
     total_contacts_count: 0,
     top_collector_name: '',
-    top_collector_recovered_amount: 0
+    top_collector_recovered_amount: 0,
+    top_collector_sort_metric: 'recovered_amount',
+    top_collector_sort_value: 0
   });
   const [collectorCommissionRules, setCollectorCommissionRules] = useState(null);
   const [followupLoading, setFollowupLoading] = useState(false);
@@ -332,7 +334,9 @@ export default function PosPage() {
         commission_over_recovered_rate: Number(collectorRankingData?.summary?.commission_over_recovered_rate ?? 0),
         total_contacts_count: Number(collectorRankingData?.summary?.total_contacts_count ?? 0),
         top_collector_name: String(collectorRankingData?.summary?.top_collector_name ?? ''),
-        top_collector_recovered_amount: Number(collectorRankingData?.summary?.top_collector_recovered_amount ?? 0)
+        top_collector_recovered_amount: Number(collectorRankingData?.summary?.top_collector_recovered_amount ?? 0),
+        top_collector_sort_metric: String(collectorRankingData?.summary?.top_collector_sort_metric ?? 'recovered_amount'),
+        top_collector_sort_value: Number(collectorRankingData?.summary?.top_collector_sort_value ?? 0)
       });
       setCollectorCommissionRules(collectorRankingData?.commission_rules ?? null);
     } catch (err) {
@@ -1159,6 +1163,13 @@ ${sale.notes ? `Nota: ${sale.notes}` : ''}
               <p className="text-xs text-slate-500">{collectorLeadLabel}</p>
               <p className="text-sm font-semibold text-slate-900">{collectorRankingSummary.top_collector_name || '-'}</p>
               <p className="text-xs text-slate-500">${collectorRankingSummary.top_collector_recovered_amount.toFixed(2)} · {collectorRankingSummary.total_contacts_count} contactos</p>
+              <p className="text-xs text-slate-500">
+                {collectorRankingSummary.top_collector_sort_metric === 'response_rate'
+                  ? `${collectorRankingSummary.top_collector_sort_value.toFixed(2)}% resp.`
+                  : collectorRankingSummary.top_collector_sort_metric === 'contacts_count'
+                    ? `${collectorRankingSummary.top_collector_sort_value.toFixed(0)} contactos`
+                    : `$${collectorRankingSummary.top_collector_sort_value.toFixed(2)} recuperado`}
+              </p>
             </div>
           </div>
           {collectorCommissionRules && (
