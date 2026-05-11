@@ -369,6 +369,39 @@ export default function AdminBillingPage() {
     }
   };
 
+  const onExportDailyPriorityCsv = () => {
+    if (dailyPriorityRows.length === 0) return;
+    const headers = [
+      'tenant_id',
+      'tenant_name',
+      'offer_code',
+      'offer_label',
+      'score',
+      'checkout_to_approved_rate',
+      'click_to_approved_rate'
+    ];
+    const rowsCsv = dailyPriorityRows.map((row) => {
+      const recommendation = buildCommercialRecommendation(row);
+      return [
+        row.tenant_id,
+        row.tenant_name ?? `Tenant ${row.tenant_id}`,
+        recommendation.code,
+        recommendation.label,
+        buildOpportunityScore(row),
+        Number(row.checkout_to_approved_rate ?? 0).toFixed(2),
+        Number(row.click_to_approved_rate ?? 0).toFixed(2)
+      ];
+    });
+    const content = [
+      headers.map(csvSafe).join(','),
+      ...rowsCsv.map((line) => line.map(csvSafe).join(','))
+    ].join('\n');
+    downloadBlob(
+      new Blob([content], { type: 'text/csv;charset=utf-8;' }),
+      `billing_daily_priority_${new Date().toISOString().slice(0, 10)}.csv`
+    );
+  };
+
   const onExportSessions = async () => {
     setExportError('');
     try {
@@ -992,6 +1025,13 @@ export default function AdminBillingPage() {
               }}
             >
               Copiar campaña del día
+            </button>
+            <button
+              className="rounded border border-sky-300 px-2 py-1 text-xs text-sky-700 disabled:opacity-50"
+              disabled={dailyPriorityRows.length === 0}
+              onClick={onExportDailyPriorityCsv}
+            >
+              Exportar prioridad CSV
             </button>
           </div>
           <div className="mt-2 flex flex-wrap gap-2">
