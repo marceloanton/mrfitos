@@ -138,6 +138,19 @@ function buildOpportunityScore(row) {
   return Math.max(0, Math.min(100, score));
 }
 
+function buildCommercialRecommendation(row) {
+  const score = buildOpportunityScore(row);
+  const checkouts = toInt(row?.checkout_sessions);
+  const approvedRate = Number(row?.checkout_to_approved_rate ?? 0);
+  if (score >= 75 && checkouts >= 8) {
+    return { code: 'plan_scale', label: 'Ofrecer Plan Scale', tone: 'bg-violet-100 text-violet-800' };
+  }
+  if (score >= 60 && approvedRate >= 25) {
+    return { code: 'plan_pro', label: 'Ofrecer Plan Pro', tone: 'bg-indigo-100 text-indigo-800' };
+  }
+  return { code: 'addon_whatsapp', label: 'Ofrecer Add-on WhatsApp', tone: 'bg-emerald-100 text-emerald-800' };
+}
+
 export default function AdminBillingPage() {
   const today = new Date().toISOString().slice(0, 10);
   const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10);
@@ -506,6 +519,14 @@ export default function AdminBillingPage() {
     () => tenantRanking.filter((row) => buildOpportunityScore(row) >= opportunityThreshold),
     [tenantRanking, opportunityThreshold]
   );
+  const recommendationSummary = useMemo(() => {
+    const base = { plan_scale: 0, plan_pro: 0, addon_whatsapp: 0 };
+    for (const row of highOpportunityRows) {
+      const recommendation = buildCommercialRecommendation(row);
+      if (base[recommendation.code] != null) base[recommendation.code] += 1;
+    }
+    return base;
+  }, [highOpportunityRows]);
   const highOpportunitySummary = useMemo(() => {
     if (highOpportunityRows.length === 0) return null;
     const top = [...highOpportunityRows]
@@ -747,6 +768,20 @@ export default function AdminBillingPage() {
 
       <div className="space-y-3 rounded-xl bg-white p-4 shadow-sm">
         <h3 className="text-lg font-semibold text-slate-900">Ranking de tenants por conversión</h3>
+        <div className="grid gap-3 md:grid-cols-3">
+          <article className="rounded-lg border border-slate-200 p-3">
+            <p className="text-xs text-slate-500">Recomendación Plan Scale</p>
+            <p className="text-2xl font-semibold text-slate-900">{recommendationSummary.plan_scale}</p>
+          </article>
+          <article className="rounded-lg border border-slate-200 p-3">
+            <p className="text-xs text-slate-500">Recomendación Plan Pro</p>
+            <p className="text-2xl font-semibold text-slate-900">{recommendationSummary.plan_pro}</p>
+          </article>
+          <article className="rounded-lg border border-slate-200 p-3">
+            <p className="text-xs text-slate-500">Recomendación Add-on WhatsApp</p>
+            <p className="text-2xl font-semibold text-slate-900">{recommendationSummary.addon_whatsapp}</p>
+          </article>
+        </div>
         <div className="flex flex-wrap items-center gap-3">
           <input
             id="only-high-opportunity"
@@ -855,18 +890,20 @@ export default function AdminBillingPage() {
                 <th className="p-3">Checkout→Approved</th>
                 <th className="p-3">Click→Approved</th>
                 <th className="p-3">Oportunidad</th>
+                <th className="p-3">Oferta sugerida</th>
                 <th className="p-3">Acción</th>
               </tr>
             </thead>
             <tbody>
               {rankingLoading ? (
-                <tr><td className="p-3 text-slate-500" colSpan={9}>Cargando ranking...</td></tr>
+                <tr><td className="p-3 text-slate-500" colSpan={10}>Cargando ranking...</td></tr>
               ) : rankingRows.length === 0 ? (
-                <tr><td className="p-3 text-slate-500" colSpan={9}>Sin datos</td></tr>
+                <tr><td className="p-3 text-slate-500" colSpan={10}>Sin datos</td></tr>
               ) : (
                 rankingRows.map((row) => {
                   const score = buildOpportunityScore(row);
                   const highOpportunity = score >= opportunityThreshold;
+                  const recommendation = buildCommercialRecommendation(row);
                   return (
                   <tr key={row.tenant_id} className={`border-t border-slate-100 ${highOpportunity ? 'bg-amber-50/50' : ''}`}>
                     <td className="p-3">{row.tenant_id}</td>
@@ -886,6 +923,11 @@ export default function AdminBillingPage() {
                     <td className="p-3">
                       <span className={`rounded px-2 py-1 text-xs font-semibold ${highOpportunity ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-700'}`}>
                         {score}
+                      </span>
+                    </td>
+                    <td className="p-3">
+                      <span className={`rounded px-2 py-1 text-xs font-semibold ${recommendation.tone}`}>
+                        {recommendation.label}
                       </span>
                     </td>
                     <td className="p-3">
