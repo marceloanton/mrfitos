@@ -25,6 +25,8 @@ export default function PosPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
+  const [showCollectionsHub, setShowCollectionsHub] = useState(false);
+  const [showRiskHub, setShowRiskHub] = useState(false);
   const [sales, setSales] = useState([]);
   const [charges, setCharges] = useState([]);
   const [autoSettleMethod, setAutoSettleMethod] = useState('transfer');
@@ -1073,12 +1075,39 @@ ${sale.notes ? `Nota: ${sale.notes}` : ''}
 
   return (
     <section className="space-y-4">
-      <div className="rounded-xl bg-white p-4 shadow-sm">
+      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
         <h2 className="text-2xl font-semibold text-slate-900">POS Gym</h2>
         <p className="text-sm text-slate-600">Venta en mostrador: cobro inmediato, efectivo o cuenta del socio para débito automático.</p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button
+            className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+            onClick={() => document.getElementById('pos-caja')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+          >
+            Ir a Caja
+          </button>
+          <button
+            className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+            onClick={() => document.getElementById('pos-ventas')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+          >
+            Ir a Ventas
+          </button>
+          <button
+            className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+            onClick={() => setShowCollectionsHub((v) => !v)}
+          >
+            {showCollectionsHub ? 'Ocultar cobranza avanzada' : 'Mostrar cobranza avanzada'}
+          </button>
+          <button
+            className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+            onClick={() => setShowRiskHub((v) => !v)}
+          >
+            {showRiskHub ? 'Ocultar riesgo y auditoría' : 'Mostrar riesgo y auditoría'}
+          </button>
+        </div>
       </div>
 
-      <div className="rounded-xl bg-white p-4 shadow-sm">
+      {showCollectionsHub && (
+      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
         <div className="mb-3 flex flex-wrap items-end gap-2">
           <input className="rounded border border-slate-300 p-2 text-sm" type="date" value={followupDateFrom} onChange={(e) => setFollowupDateFrom(e.target.value)} />
           <input className="rounded border border-slate-300 p-2 text-sm" type="date" value={followupDateTo} onChange={(e) => setFollowupDateTo(e.target.value)} />
@@ -1304,6 +1333,7 @@ ${sale.notes ? `Nota: ${sale.notes}` : ''}
           ))}
         </div>
       </div>
+      )}
 
       <div className="grid gap-3 md:grid-cols-4">
         <div className="rounded-xl bg-white p-4 shadow-sm">
@@ -1617,7 +1647,7 @@ ${sale.notes ? `Nota: ${sale.notes}` : ''}
         </div>
       </div>
 
-      <div className="rounded-xl bg-white p-4 shadow-sm">
+      <div id="pos-ventas" className="rounded-xl bg-white p-4 shadow-sm">
         <h3 className="mb-2 text-lg font-semibold text-slate-900">Últimas ventas POS</h3>
         <div className="mb-3 flex flex-wrap items-center gap-2">
           <input
@@ -1668,7 +1698,7 @@ ${sale.notes ? `Nota: ${sale.notes}` : ''}
         </div>
       </div>
 
-      <div className="rounded-xl bg-white p-4 shadow-sm">
+      <div id="pos-caja" className="rounded-xl bg-white p-4 shadow-sm">
         <h3 className="mb-2 text-lg font-semibold text-slate-900">Últimos cierres de caja</h3>
         <div className="mb-3 flex items-center gap-2">
           <input
@@ -1715,6 +1745,8 @@ ${sale.notes ? `Nota: ${sale.notes}` : ''}
         </div>
       </div>
 
+      {showRiskHub && (
+      <>
       <div className="rounded-xl bg-white p-4 shadow-sm">
         <div className="mb-2 flex items-center justify-between gap-2">
           <h3 className="text-lg font-semibold text-slate-900">Alertas de Riesgo POS</h3>
@@ -1887,6 +1919,8 @@ ${sale.notes ? `Nota: ${sale.notes}` : ''}
           ))}
         </div>
       </div>
+      </>
+      )}
     </section>
   );
 }
