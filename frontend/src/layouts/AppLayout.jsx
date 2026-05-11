@@ -15,6 +15,33 @@ export default function AppLayout() {
   const token = useAuthStore((state) => state.token);
   const availableGyms = Array.isArray(user?.available_gyms) ? user.available_gyms : [];
   const [riskBanner, setRiskBanner] = useState(null);
+  const [receptionNavMode, setReceptionNavMode] = useState(true);
+  const receptionNavStorageKey = user
+    ? `layout-reception-nav-v1:${user.id || user.email || 'user'}:${user.gym_id || 'gym'}`
+    : null;
+
+  useEffect(() => {
+    if (!receptionNavStorageKey) return;
+    try {
+      const raw = localStorage.getItem(receptionNavStorageKey);
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      if (typeof parsed?.enabled === 'boolean') {
+        setReceptionNavMode(parsed.enabled);
+      }
+    } catch {
+      // ignore corrupted localStorage
+    }
+  }, [receptionNavStorageKey]);
+
+  useEffect(() => {
+    if (!receptionNavStorageKey) return;
+    try {
+      localStorage.setItem(receptionNavStorageKey, JSON.stringify({ enabled: receptionNavMode }));
+    } catch {
+      // ignore write failure
+    }
+  }, [receptionNavStorageKey, receptionNavMode]);
 
   useEffect(() => {
     let alive = true;
@@ -51,20 +78,28 @@ export default function AppLayout() {
           <h1 className="text-xl font-semibold text-slate-900">GymSaaS MVP</h1>
           <div className="flex items-center gap-2">
             <NavLink to="/dashboard" className="rounded px-3 py-2 text-sm hover:bg-slate-100">Dashboard</NavLink>
-            <NavLink to="/pricing" className="rounded px-3 py-2 text-sm hover:bg-slate-100">Precios</NavLink>
+            {!receptionNavMode && <NavLink to="/pricing" className="rounded px-3 py-2 text-sm hover:bg-slate-100">Precios</NavLink>}
             {hasPermission('members.read') && <NavLink to="/members" className="rounded px-3 py-2 text-sm hover:bg-slate-100">Socios</NavLink>}
-            {hasPermission('plans.read') && <NavLink to="/plans" className="rounded px-3 py-2 text-sm hover:bg-slate-100">Planes</NavLink>}
-            {hasPermission('memberships.read') && <NavLink to="/memberships" className="rounded px-3 py-2 text-sm hover:bg-slate-100">Membresias</NavLink>}
+            {!receptionNavMode && hasPermission('plans.read') && <NavLink to="/plans" className="rounded px-3 py-2 text-sm hover:bg-slate-100">Planes</NavLink>}
+            {!receptionNavMode && hasPermission('memberships.read') && <NavLink to="/memberships" className="rounded px-3 py-2 text-sm hover:bg-slate-100">Membresias</NavLink>}
             {hasPermission('payments.read') && <NavLink to="/payments" className="rounded px-3 py-2 text-sm hover:bg-slate-100">Pagos</NavLink>}
             {canPosRead && <NavLink to="/pos" className="rounded px-3 py-2 text-sm hover:bg-slate-100">POS</NavLink>}
             {hasPermission('attendance.read') && <NavLink to="/attendance" className="rounded px-3 py-2 text-sm hover:bg-slate-100">Asistencia</NavLink>}
             {hasPermission('whatsapp.read') && <NavLink to="/reminders" className="rounded px-3 py-2 text-sm hover:bg-slate-100">WhatsApp</NavLink>}
-            {hasPermission('reports.read') && <NavLink to="/reports" className="rounded px-3 py-2 text-sm hover:bg-slate-100">Reportes</NavLink>}
-            <NavLink to="/operational-guide" className="rounded px-3 py-2 text-sm hover:bg-slate-100">Guía Operativa</NavLink>
-            {hasPermission('subscriptions.manage') && <NavLink to="/admin/subscriptions" className="rounded px-3 py-2 text-sm hover:bg-slate-100">Admin Suscripción</NavLink>}
-            {hasPermission('subscriptions.manage') && <NavLink to="/admin/billing" className="rounded px-3 py-2 text-sm hover:bg-slate-100">Admin Billing</NavLink>}
-            {hasPermission('subscriptions.manage.catalog') && <NavLink to="/admin/modules" className="rounded px-3 py-2 text-sm hover:bg-slate-100">Admin Módulos</NavLink>}
-            <NavLink to="/billing/self-service" className="rounded px-3 py-2 text-sm hover:bg-slate-100">Mi Plan</NavLink>
+            {!receptionNavMode && hasPermission('reports.read') && <NavLink to="/reports" className="rounded px-3 py-2 text-sm hover:bg-slate-100">Reportes</NavLink>}
+            {!receptionNavMode && <NavLink to="/operational-guide" className="rounded px-3 py-2 text-sm hover:bg-slate-100">Guía Operativa</NavLink>}
+            {!receptionNavMode && hasPermission('subscriptions.manage') && <NavLink to="/admin/subscriptions" className="rounded px-3 py-2 text-sm hover:bg-slate-100">Admin Suscripción</NavLink>}
+            {!receptionNavMode && hasPermission('subscriptions.manage') && <NavLink to="/admin/billing" className="rounded px-3 py-2 text-sm hover:bg-slate-100">Admin Billing</NavLink>}
+            {!receptionNavMode && hasPermission('subscriptions.manage.catalog') && <NavLink to="/admin/modules" className="rounded px-3 py-2 text-sm hover:bg-slate-100">Admin Módulos</NavLink>}
+            {!receptionNavMode && <NavLink to="/billing/self-service" className="rounded px-3 py-2 text-sm hover:bg-slate-100">Mi Plan</NavLink>}
+            <button
+              className={`rounded px-3 py-2 text-xs font-semibold ${
+                receptionNavMode ? 'bg-emerald-600 text-white' : 'border border-slate-300 text-slate-700'
+              }`}
+              onClick={() => setReceptionNavMode((v) => !v)}
+            >
+              {receptionNavMode ? 'Modo Recepción ON' : 'Modo Recepción OFF'}
+            </button>
             {availableGyms.length > 1 && (
               <select
                 className="rounded border border-slate-300 px-2 py-2 text-sm"
