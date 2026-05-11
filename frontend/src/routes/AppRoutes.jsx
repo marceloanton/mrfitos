@@ -47,7 +47,7 @@ export default function AppRoutes() {
             <Route element={<PermissionRoute permission="dashboard.read" />}>
               <Route path="/dashboard" element={<DashboardPage />} />
             </Route>
-            <Route element={<PermissionRoute permission="members.read" />}>
+            <Route element={<PermissionRoute permission="members.read" capability="members" />}>
               <Route path="/members" element={<MembersPage />} />
             </Route>
             <Route element={<PermissionRoute permission="plans.read" />}>
@@ -56,32 +56,32 @@ export default function AppRoutes() {
             <Route element={<PermissionRoute permission="memberships.read" />}>
               <Route path="/memberships" element={<MembershipsPage />} />
             </Route>
-            <Route element={<PermissionRoute permissions={['pos.read', 'payments.read']} />}>
+            <Route element={<PermissionRoute permissions={['pos.read', 'payments.read']} capability="pos" />}>
               <Route path="/pos" element={<PosHomePage />} />
               <Route path="/pos/caja" element={<PosPage />} />
               <Route path="/pos/ventas" element={<PosPage />} />
               <Route path="/pos/productos" element={<PosPage />} />
               <Route path="/pos/control" element={<PosPage />} />
             </Route>
-            <Route element={<PermissionRoute permission="payments.read" />}>
+            <Route element={<PermissionRoute permission="payments.read" capability="payments" />}>
               <Route path="/payments" element={<PaymentsPage />} />
             </Route>
-            <Route element={<PermissionRoute permission="attendance.read" />}>
+            <Route element={<PermissionRoute permission="attendance.read" capability="attendance" />}>
               <Route path="/attendance" element={<AttendancePage />} />
             </Route>
             <Route element={<PermissionRoute permission="whatsapp.read" />}>
               <Route path="/reminders" element={<RemindersPage />} />
             </Route>
-            <Route element={<PermissionRoute permission="reports.read" />}>
+            <Route element={<PermissionRoute permission="reports.read" capability="reports" />}>
               <Route path="/reports" element={<ReportsPage />} />
             </Route>
             <Route path="/operational-guide" element={<OperationalGuidePage />} />
-            <Route element={<PermissionRoute permission="subscriptions.manage" />}>
+            <Route element={<PermissionRoute permission="subscriptions.manage" capability="management" />}>
               <Route path="/admin/subscription" element={<AdminSubscriptionPage />} />
               <Route path="/admin/subscriptions" element={<AdminSubscriptionPage />} />
               <Route path="/admin/billing" element={<AdminBillingPage />} />
             </Route>
-            <Route element={<PermissionRoute permission="subscriptions.manage.catalog" />}>
+            <Route element={<PermissionRoute permission="subscriptions.manage.catalog" capability="management" />}>
               <Route path="/admin/modules" element={<AdminModulesPage />} />
             </Route>
             <Route path="/billing/self-service" element={<SelfServiceUpgradePage />} />
