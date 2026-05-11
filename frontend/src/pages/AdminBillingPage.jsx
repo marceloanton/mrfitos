@@ -68,7 +68,8 @@ const TRACKING_EVENTS = [
   { key: 'sales_pitch_copy_segment', label: 'Pitch copy segment' },
   { key: 'sales_focus_tenant', label: 'Tenant focus' },
   { key: 'sales_priority_export_csv', label: 'Priority CSV export' },
-  { key: 'sales_day_reset', label: 'Sales day reset' }
+  { key: 'sales_day_reset', label: 'Sales day reset' },
+  { key: 'sales_executive_summary_copy', label: 'Executive summary copy' }
 ];
 const MIN_SAMPLE_CHECKOUTS = 10;
 const RECOMMENDED_CTA_FLOWS = [
@@ -100,7 +101,8 @@ function normalizeTrackingSummary(payload) {
       sales_pitch_copy_segment: toInt(totals?.sales_pitch_copy_segment ?? 0),
       sales_focus_tenant: toInt(totals?.sales_focus_tenant ?? 0),
       sales_priority_export_csv: toInt(totals?.sales_priority_export_csv ?? 0),
-      sales_day_reset: toInt(totals?.sales_day_reset ?? 0)
+      sales_day_reset: toInt(totals?.sales_day_reset ?? 0),
+      sales_executive_summary_copy: toInt(totals?.sales_executive_summary_copy ?? 0)
     },
     daily,
     byContext: payload?.by_context ?? {},
@@ -118,7 +120,8 @@ function buildCompositeKpi(funnelData, trackingData) {
     toInt(trackingData?.totals?.sales_pitch_copy_segment) +
     toInt(trackingData?.totals?.sales_focus_tenant) +
     toInt(trackingData?.totals?.sales_priority_export_csv) +
-    toInt(trackingData?.totals?.sales_day_reset);
+    toInt(trackingData?.totals?.sales_day_reset) +
+    toInt(trackingData?.totals?.sales_executive_summary_copy);
   const checkoutSessions = toInt(funnelData?.total_sessions);
   const approved = toInt(funnelData?.approved_sessions);
   const ctrUpgrade = checkoutSessions > 0 ? (clicks / checkoutSessions) * 100 : 0;
@@ -141,7 +144,8 @@ function buildContextKpi(contextTotals = {}) {
     toInt(contextTotals?.sales_pitch_copy_segment) +
     toInt(contextTotals?.sales_focus_tenant) +
     toInt(contextTotals?.sales_priority_export_csv) +
-    toInt(contextTotals?.sales_day_reset);
+    toInt(contextTotals?.sales_day_reset) +
+    toInt(contextTotals?.sales_executive_summary_copy);
   const checkoutSessions = toInt(contextTotals?.checkout_created);
   const approved = toInt(contextTotals?.approved);
   const ctrUpgrade = checkoutSessions > 0 ? (clicks / checkoutSessions) * 100 : 0;
@@ -771,6 +775,31 @@ export default function AdminBillingPage() {
       ...lines
     ].join('\n');
   }, [dailyPriorityRows, filters.from, filters.to]);
+  const executiveDailySummary = useMemo(() => {
+    const top = dailyPriorityRows
+      .map((row) => {
+        const recommendation = buildCommercialRecommendation(row);
+        return `- Tenant ${row.tenant_id}: ${recommendation.label} (score ${buildOpportunityScore(row)})`;
+      })
+      .join('\n');
+    return [
+      'Resumen ejecutivo diario - MRAnalytics',
+      `Periodo: ${filters.from || '-'} a ${filters.to || '-'}`,
+      `Salud comercial: ${salesOpsHealth.label}`,
+      `Focus: ${salesOpsFocusCount} | Pitch: ${salesOpsPitchCopies} | Checkout: ${salesOpsCheckoutCreated}`,
+      `Focus→Checkout: ${salesOpsFocusToCheckoutRate.toFixed(2)}%`,
+      top ? `Top prioridad:\n${top}` : 'Top prioridad: sin datos'
+    ].join('\n');
+  }, [
+    dailyPriorityRows,
+    filters.from,
+    filters.to,
+    salesOpsHealth.label,
+    salesOpsFocusCount,
+    salesOpsPitchCopies,
+    salesOpsCheckoutCreated,
+    salesOpsFocusToCheckoutRate
+  ]);
   const highOpportunitySummary = useMemo(() => {
     if (highOpportunityRows.length === 0) return null;
     const top = [...highOpportunityRows]
@@ -1090,6 +1119,25 @@ export default function AdminBillingPage() {
               onClick={onExportDailyPriorityCsv}
             >
               Exportar prioridad CSV
+            </button>
+            <button
+              className="rounded border border-emerald-300 px-2 py-1 text-xs text-emerald-700"
+              onClick={async () => {
+                setCampaignMessage(executiveDailySummary);
+                trackEvent('sales_executive_summary_copy', 'admin_billing', {
+                  rows: dailyPriorityRows.length,
+                  health: salesOpsHealth.label,
+                  focus: salesOpsFocusCount,
+                  checkouts: salesOpsCheckoutCreated
+                });
+                try {
+                  await navigator.clipboard.writeText(executiveDailySummary);
+                } catch {
+                  // non-blocking
+                }
+              }}
+            >
+              Copiar resumen ejecutivo
             </button>
           </div>
           <div className="mt-2 flex flex-wrap gap-2">
