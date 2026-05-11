@@ -12,6 +12,7 @@ export default function AppLayout() {
   const user = useAuthStore((state) => state.user);
   const hasPermission = useAuthStore((state) => state.hasPermission);
   const canPosRead = hasPermission('pos.read') || hasPermission('payments.read');
+  const isManagementProfile = hasPermission('subscriptions.manage') || hasPermission('reports.read');
   const token = useAuthStore((state) => state.token);
   const availableGyms = Array.isArray(user?.available_gyms) ? user.available_gyms : [];
   const [riskBanner, setRiskBanner] = useState(null);
@@ -177,17 +178,19 @@ export default function AppLayout() {
         </div>
       )}
 
-      <div className="mx-auto flex max-w-7xl justify-end px-6 pt-3 print:hidden">
-        <span
-          className={`rounded-full px-3 py-1 text-xs font-semibold ${
-            receptionNavMode
-              ? 'bg-emerald-100 text-emerald-700 ring-1 ring-emerald-300'
-              : 'bg-slate-100 text-slate-700 ring-1 ring-slate-300'
-          }`}
-        >
-          Recepción {receptionNavMode ? 'ON' : 'OFF'}
-        </span>
-      </div>
+      {!isManagementProfile && (
+        <div className="mx-auto flex max-w-7xl justify-end px-6 pt-3 print:hidden">
+          <span
+            className={`rounded-full px-3 py-1 text-xs font-semibold ${
+              receptionNavMode
+                ? 'bg-emerald-100 text-emerald-700 ring-1 ring-emerald-300'
+                : 'bg-slate-100 text-slate-700 ring-1 ring-slate-300'
+            }`}
+          >
+            Recepción {receptionNavMode ? 'ON' : 'OFF'}
+          </span>
+        </div>
+      )}
 
       <main className="mx-auto max-w-7xl p-6">
         <Outlet />
