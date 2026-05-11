@@ -46,7 +46,7 @@ export default function AppLayout() {
 
   return (
     <div className="min-h-screen bg-slate-100">
-      <header className="border-b border-slate-200 bg-white px-6 py-4">
+      <header className="border-b border-slate-200 bg-white px-6 py-4 print:hidden">
         <div className="mx-auto flex max-w-7xl items-center justify-between">
           <h1 className="text-xl font-semibold text-slate-900">GymSaaS MVP</h1>
           <div className="flex items-center gap-2">
@@ -93,10 +93,10 @@ export default function AppLayout() {
         </div>
       </header>
 
-      {switchingGym && <div className="border-b border-sky-200 bg-sky-50 px-6 py-2 text-sm text-sky-800">Cambiando sede...</div>}
+      {switchingGym && <div className="border-b border-sky-200 bg-sky-50 px-6 py-2 text-sm text-sky-800 print:hidden">Cambiando sede...</div>}
 
       {riskBanner && (
-        <div className="border-b border-rose-300 bg-rose-50 px-6 py-3 text-sm text-rose-900">
+        <div className="border-b border-rose-300 bg-rose-50 px-6 py-3 text-sm text-rose-900 print:hidden">
           <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-2">
             <p>Limite critico del plan {riskBanner.planName}: {riskBanner.percent}% de uso. Recomendado: upgrade inmediato.</p>
             <div className="flex gap-2">
