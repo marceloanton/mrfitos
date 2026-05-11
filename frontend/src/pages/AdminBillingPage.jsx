@@ -161,6 +161,7 @@ export default function AdminBillingPage() {
   const [rankingError, setRankingError] = useState('');
   const [tenantRanking, setTenantRanking] = useState([]);
   const [showOnlyHighOpportunity, setShowOnlyHighOpportunity] = useState(false);
+  const [campaignMessage, setCampaignMessage] = useState('');
 
   const cards = useMemo(() => {
     const conversion = Number.isFinite(funnel.approval_rate) ? funnel.approval_rate : 0;
@@ -401,6 +402,24 @@ export default function AdminBillingPage() {
     () => tenantRanking.filter((row) => buildOpportunityScore(row) >= 60),
     [tenantRanking]
   );
+  const highOpportunitySummary = useMemo(() => {
+    if (highOpportunityRows.length === 0) return null;
+    const top = [...highOpportunityRows]
+      .sort((a, b) => buildOpportunityScore(b) - buildOpportunityScore(a))
+      .slice(0, 10);
+    const lines = top.map((row) => {
+      const score = buildOpportunityScore(row);
+      const rate = Number(row.checkout_to_approved_rate ?? 0).toFixed(2);
+      return `- Tenant ${row.tenant_id} (${row.tenant_name ?? 'Sin nombre'}) | Score ${score} | Checkout->Approved ${rate}%`;
+    });
+    return [
+      `Campana comercial Billing MRAnalytics`,
+      `Periodo: ${filters.from || '-'} a ${filters.to || '-'}`,
+      `Tenants prioritarios (${top.length} de ${highOpportunityRows.length}):`,
+      ...lines,
+      'Accion sugerida: contacto comercial + oferta de upgrade plan/add-on segun uso.'
+    ].join('\n');
+  }, [highOpportunityRows, filters.from, filters.to]);
 
   return (
     <section className="space-y-4">
@@ -628,6 +647,21 @@ export default function AdminBillingPage() {
           >
             Copiar IDs prioritarios ({highOpportunityRows.length})
           </button>
+          <button
+            className="rounded border border-emerald-300 px-3 py-1 text-xs text-emerald-700 disabled:opacity-50"
+            disabled={!highOpportunitySummary}
+            onClick={async () => {
+              if (!highOpportunitySummary) return;
+              setCampaignMessage(highOpportunitySummary);
+              try {
+                await navigator.clipboard.writeText(highOpportunitySummary);
+              } catch {
+                // non-blocking
+              }
+            }}
+          >
+            Copiar plan comercial
+          </button>
           {highOpportunityRows.slice(0, 3).map((row) => (
             <button
               key={`quick-focus-${row.tenant_id}`}
@@ -639,6 +673,12 @@ export default function AdminBillingPage() {
             </button>
           ))}
         </div>
+        {campaignMessage && (
+          <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3">
+            <p className="text-xs font-semibold uppercase text-emerald-800">Plan Comercial Generado</p>
+            <pre className="mt-2 whitespace-pre-wrap text-xs text-emerald-900">{campaignMessage}</pre>
+          </div>
+        )}
         {rankingError && <p className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{rankingError}</p>}
         <div className="overflow-x-auto rounded-lg border border-slate-200">
           <table className="min-w-full text-sm">
