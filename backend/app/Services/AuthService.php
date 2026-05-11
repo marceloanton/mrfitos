@@ -97,6 +97,8 @@ final class AuthService
 
         $permissions = array_values(array_unique($permissions));
         $roles = array_values(array_unique($roles));
+        $roleProfile = self::buildRoleProfile($permissions, $roles);
+        $capabilities = self::buildCapabilities($permissions, $roleProfile);
         $availableGymsList = array_values($availableGyms);
 
         $ttl = (int) Env::get('JWT_TTL', 3600);
@@ -108,6 +110,8 @@ final class AuthService
             'name' => trim($user['first_name'] . ' ' . $user['last_name']),
             'roles' => $roles,
             'permissions' => $permissions,
+            'role_profile' => $roleProfile,
+            'capabilities' => $capabilities,
             'available_gyms' => $availableGymsList,
             'exp' => time() + $ttl
         ];
@@ -124,8 +128,51 @@ final class AuthService
                 'name' => trim($user['first_name'] . ' ' . $user['last_name']),
                 'roles' => $roles,
                 'permissions' => $permissions,
+                'role_profile' => $roleProfile,
+                'capabilities' => $capabilities,
                 'available_gyms' => $availableGymsList
             ]
+        ];
+    }
+
+    public static function buildRoleProfile(array $permissions, array $roles = []): array
+    {
+        $has = static fn(string $permission): bool => in_array($permission, $permissions, true);
+
+        $code = 'operator';
+        $label = 'Operador';
+        if (
+            in_array('super_admin', $roles, true)
+            || in_array('admin', $roles, true)
+            || $has('subscriptions.manage')
+            || $has('reports.read')
+        ) {
+            $code = 'manager';
+            $label = 'Gerente';
+        } elseif ($has('attendance.write') || $has('members.write') || $has('payments.write')) {
+            $code = 'reception';
+            $label = 'Recepción';
+        }
+
+        return [
+            'code' => $code,
+            'label' => $label,
+            'is_management' => $code === 'manager',
+            'is_operational' => $code !== 'manager'
+        ];
+    }
+
+    public static function buildCapabilities(array $permissions, array $roleProfile): array
+    {
+        $has = static fn(string $permission): bool => in_array($permission, $permissions, true);
+        return [
+            'pos' => $has('pos.read') || $has('payments.read'),
+            'attendance' => $has('attendance.read'),
+            'members' => $has('members.read'),
+            'payments' => $has('payments.read'),
+            'reports' => $has('reports.read'),
+            'management' => (bool) ($roleProfile['is_management'] ?? false),
+            'operational' => (bool) ($roleProfile['is_operational'] ?? false)
         ];
     }
 

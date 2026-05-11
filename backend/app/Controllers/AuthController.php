@@ -41,6 +41,14 @@ final class AuthController
     public function me(): void
     {
         $authUser = json_decode($_SERVER['auth_user'] ?? '{}', true) ?: [];
+        $permissions = is_array($authUser['permissions'] ?? null) ? $authUser['permissions'] : [];
+        $roles = is_array($authUser['roles'] ?? null) ? $authUser['roles'] : [];
+        if (!is_array($authUser['role_profile'] ?? null)) {
+            $authUser['role_profile'] = AuthService::buildRoleProfile($permissions, $roles);
+        }
+        if (!is_array($authUser['capabilities'] ?? null)) {
+            $authUser['capabilities'] = AuthService::buildCapabilities($permissions, $authUser['role_profile']);
+        }
         Response::json(['success' => true, 'data' => ['user' => $authUser]]);
     }
 

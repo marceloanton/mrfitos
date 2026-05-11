@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { fetchDashboardMetrics } from '../services/dashboardService';
 import { trackEvent } from '../services/trackingService';
 import { useAuthStore } from '../stores/authStore';
-import { inferHudRole } from '../utils/roleProfile';
+import { resolveHudRole } from '../utils/roleProfile';
 
 export default function DashboardPage() {
   const user = useAuthStore((state) => state.user);
@@ -23,8 +23,7 @@ export default function DashboardPage() {
       limits_health: { max_percent: 0, risk: 'low', items: [] }
     }
   });
-  const permissions = user?.permissions ?? [];
-  const hudRole = inferHudRole(permissions);
+  const hudRole = resolveHudRole(user);
 
   useEffect(() => {
     const run = async () => {

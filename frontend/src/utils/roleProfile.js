@@ -14,3 +14,21 @@ export function isManagementProfile(permissions = []) {
   return role.code === 'manager';
 }
 
+export function resolveHudRole(user = null) {
+  const profile = user?.role_profile;
+  if (profile && typeof profile.code === 'string' && typeof profile.label === 'string') {
+    return {
+      code: profile.code,
+      label: profile.label
+    };
+  }
+  return inferHudRole(user?.permissions ?? []);
+}
+
+export function resolveManagementFlag(user = null) {
+  const profile = user?.role_profile;
+  if (typeof profile?.is_management === 'boolean') {
+    return profile.is_management;
+  }
+  return isManagementProfile(user?.permissions ?? []);
+}
