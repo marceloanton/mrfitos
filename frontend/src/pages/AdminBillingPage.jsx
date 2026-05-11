@@ -66,7 +66,8 @@ const TRACKING_EVENTS = [
   { key: 'upgrade_recommended_cta_click', label: 'Recommended CTA click' },
   { key: 'sales_pitch_copy_tenant', label: 'Pitch copy tenant' },
   { key: 'sales_pitch_copy_segment', label: 'Pitch copy segment' },
-  { key: 'sales_focus_tenant', label: 'Tenant focus' }
+  { key: 'sales_focus_tenant', label: 'Tenant focus' },
+  { key: 'sales_priority_export_csv', label: 'Priority CSV export' }
 ];
 const MIN_SAMPLE_CHECKOUTS = 10;
 const RECOMMENDED_CTA_FLOWS = [
@@ -95,7 +96,8 @@ function normalizeTrackingSummary(payload) {
       upgrade_recommended_cta_click: toInt(totals?.upgrade_recommended_cta_click ?? 0),
       sales_pitch_copy_tenant: toInt(totals?.sales_pitch_copy_tenant ?? 0),
       sales_pitch_copy_segment: toInt(totals?.sales_pitch_copy_segment ?? 0),
-      sales_focus_tenant: toInt(totals?.sales_focus_tenant ?? 0)
+      sales_focus_tenant: toInt(totals?.sales_focus_tenant ?? 0),
+      sales_priority_export_csv: toInt(totals?.sales_priority_export_csv ?? 0)
     },
     daily,
     byContext: payload?.by_context ?? {},
@@ -111,7 +113,8 @@ function buildCompositeKpi(funnelData, trackingData) {
     toInt(trackingData?.totals?.upgrade_recommended_cta_click) +
     toInt(trackingData?.totals?.sales_pitch_copy_tenant) +
     toInt(trackingData?.totals?.sales_pitch_copy_segment) +
-    toInt(trackingData?.totals?.sales_focus_tenant);
+    toInt(trackingData?.totals?.sales_focus_tenant) +
+    toInt(trackingData?.totals?.sales_priority_export_csv);
   const checkoutSessions = toInt(funnelData?.total_sessions);
   const approved = toInt(funnelData?.approved_sessions);
   const ctrUpgrade = checkoutSessions > 0 ? (clicks / checkoutSessions) * 100 : 0;
@@ -132,7 +135,8 @@ function buildContextKpi(contextTotals = {}) {
     toInt(contextTotals?.upgrade_recommended_cta_click) +
     toInt(contextTotals?.sales_pitch_copy_tenant) +
     toInt(contextTotals?.sales_pitch_copy_segment) +
-    toInt(contextTotals?.sales_focus_tenant);
+    toInt(contextTotals?.sales_focus_tenant) +
+    toInt(contextTotals?.sales_priority_export_csv);
   const checkoutSessions = toInt(contextTotals?.checkout_created);
   const approved = toInt(contextTotals?.approved);
   const ctrUpgrade = checkoutSessions > 0 ? (clicks / checkoutSessions) * 100 : 0;
