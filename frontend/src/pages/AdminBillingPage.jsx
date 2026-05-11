@@ -654,6 +654,18 @@ export default function AdminBillingPage() {
     return base;
   }, [highOpportunityRows]);
   const dailyPriorityRows = useMemo(() => rankingRows.slice(0, 5), [rankingRows]);
+  const dailyCampaignText = useMemo(() => {
+    if (dailyPriorityRows.length === 0) return '';
+    const lines = dailyPriorityRows.map((row) => {
+      const recommendation = buildCommercialRecommendation(row);
+      return `- Tenant ${row.tenant_id} (${row.tenant_name ?? `Tenant ${row.tenant_id}`}): ${recommendation.label}`;
+    });
+    return [
+      'Campaña del día - MRAnalytics',
+      `Periodo: ${filters.from || '-'} a ${filters.to || '-'}`,
+      ...lines
+    ].join('\n');
+  }, [dailyPriorityRows, filters.from, filters.to]);
   const highOpportunitySummary = useMemo(() => {
     if (highOpportunityRows.length === 0) return null;
     const top = [...highOpportunityRows]
@@ -924,7 +936,29 @@ export default function AdminBillingPage() {
           </article>
         </div>
         <div className="rounded-lg border border-slate-200 p-3">
-          <p className="text-sm font-semibold text-slate-900">Prioridad del día (Top 5)</p>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-sm font-semibold text-slate-900">Prioridad del día (Top 5)</p>
+            <button
+              className="rounded border border-fuchsia-300 px-2 py-1 text-xs text-fuchsia-700 disabled:opacity-50"
+              disabled={!dailyCampaignText}
+              onClick={async () => {
+                if (!dailyCampaignText) return;
+                setCampaignMessage(dailyCampaignText);
+                trackEvent('sales_pitch_copy_segment', 'admin_billing', {
+                  offer_filter: offerFilter,
+                  rows: dailyPriorityRows.length,
+                  scope: 'daily_priority'
+                });
+                try {
+                  await navigator.clipboard.writeText(dailyCampaignText);
+                } catch {
+                  // non-blocking
+                }
+              }}
+            >
+              Copiar campaña del día
+            </button>
+          </div>
           <div className="mt-2 flex flex-wrap gap-2">
             {dailyPriorityRows.length === 0 ? (
               <p className="text-xs text-slate-500">Sin prioridades para los filtros actuales.</p>
