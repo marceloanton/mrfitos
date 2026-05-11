@@ -653,6 +653,7 @@ export default function AdminBillingPage() {
     }
     return base;
   }, [highOpportunityRows]);
+  const dailyPriorityRows = useMemo(() => rankingRows.slice(0, 5), [rankingRows]);
   const highOpportunitySummary = useMemo(() => {
     if (highOpportunityRows.length === 0) return null;
     const top = [...highOpportunityRows]
@@ -921,6 +922,46 @@ export default function AdminBillingPage() {
             <p className="text-xs text-slate-500">Recomendación Add-on WhatsApp</p>
             <p className="text-2xl font-semibold text-slate-900">{recommendationSummary.addon_whatsapp}</p>
           </article>
+        </div>
+        <div className="rounded-lg border border-slate-200 p-3">
+          <p className="text-sm font-semibold text-slate-900">Prioridad del día (Top 5)</p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {dailyPriorityRows.length === 0 ? (
+              <p className="text-xs text-slate-500">Sin prioridades para los filtros actuales.</p>
+            ) : (
+              dailyPriorityRows.map((row) => {
+                const recommendation = buildCommercialRecommendation(row);
+                return (
+                  <div key={`daily-priority-${row.tenant_id}`} className="rounded border border-slate-200 bg-slate-50 px-2 py-2 text-xs">
+                    <p className="font-semibold text-slate-800">Tenant {row.tenant_id}</p>
+                    <p className="text-slate-600">{recommendation.label}</p>
+                    <div className="mt-1 flex gap-1">
+                      <button
+                        className="rounded border border-indigo-300 px-2 py-1 text-[11px] text-indigo-700"
+                        onClick={() => focusTenant(row.tenant_id)}
+                      >
+                        Foco
+                      </button>
+                      <button
+                        className="rounded border border-fuchsia-300 px-2 py-1 text-[11px] text-fuchsia-700"
+                        onClick={async () => {
+                          const pitch = buildOfferPitch(row, recommendation);
+                          setCampaignMessage(pitch);
+                          try {
+                            await navigator.clipboard.writeText(pitch);
+                          } catch {
+                            // non-blocking
+                          }
+                        }}
+                      >
+                        Copiar
+                      </button>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <input
