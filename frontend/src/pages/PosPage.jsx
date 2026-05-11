@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
+import { NavLink, useLocation } from 'react-router-dom';
 import { adjustStock, autoSettleMemberAccountCharges, bulkMarkPromiseAgendaContacted, closeCashSession, createPosAlertContact, createPosProduct, createPosSale, deletePosAlertContact, exportMemberAccountCollectorRankingCsv, exportMemberAccountContactEffectivenessCsv, exportMemberAccountPromiseAgendaCsv, exportOverduePromiseWhatsAppLinksCsv, exportPosAlertDispatchHistoryCsv, exportPosAuditCsv, exportPosAutosettleKpiCsv, exportPosZCloseCsv, getCashByOperatorReport, getCashSessionReport, getMemberAccountAging, getMemberAccountCollectorRanking, getMemberAccountCollectionsKpiToday, getMemberAccountContactEffectiveness, getMemberAccountFollowupFunnel, getMemberAccountOverdueWhatsAppLink, getMemberAccountPromiseAgenda, getOpenCashSessionSummary, getOverduePromiseWhatsAppLinks, getPosAlertNotifyLink, getPosAlerts, getPosAlertsStatus, getPosAutosettleKpi, getPosConfig, getPosSaleReceipt, getPosSaleReceiptByNumber, getPosSummary, getPosZCloseReport, listCashSessions, listLowStockProducts, listMemberAccountCharges, listPosAlertContacts, listPosAlertDispatchHistory, listPosAlertsCronHistory, listPosAudit, listPosProducts, listPosSales, listStockMovements, notifyCriticalPosAlert, openCashSession, settleMemberAccountCharge, updateMemberAccountFollowupContactResult, updatePosAlertContact, updatePosConfig, upsertMemberAccountFollowup, voidPosSale } from '../services/posService';
 import { useAuthStore } from '../stores/authStore';
 
 export default function PosPage() {
+  const location = useLocation();
   const hasPermission = useAuthStore((s) => s.hasPermission);
   const user = useAuthStore((s) => s.user);
   const canSaleCreate = hasPermission('pos.sale.create') || hasPermission('payments.write');
@@ -350,6 +352,44 @@ export default function PosPage() {
       setFollowupLoading(false);
     }
   };
+
+  useEffect(() => {
+    const path = location.pathname;
+    if (path === '/pos/control') {
+      setShowCollectionsHub(true);
+      setShowRiskHub(true);
+      window.setTimeout(() => {
+        document.getElementById('pos-control')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 30);
+      return;
+    }
+    if (path === '/pos/caja') {
+      setShowCollectionsHub(false);
+      setShowRiskHub(false);
+      window.setTimeout(() => {
+        document.getElementById('pos-caja')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 30);
+      return;
+    }
+    if (path === '/pos/ventas') {
+      setShowCollectionsHub(false);
+      setShowRiskHub(false);
+      window.setTimeout(() => {
+        document.getElementById('pos-ventas')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 30);
+      return;
+    }
+    if (path === '/pos/productos') {
+      setShowCollectionsHub(false);
+      setShowRiskHub(false);
+      window.setTimeout(() => {
+        document.getElementById('pos-productos')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 30);
+      return;
+    }
+    setShowCollectionsHub(false);
+    setShowRiskHub(false);
+  }, [location.pathname]);
 
   useEffect(() => {
     if (!collectorPrefsStorageKey) return;
@@ -1079,6 +1119,30 @@ ${sale.notes ? `Nota: ${sale.notes}` : ''}
         <h2 className="text-2xl font-semibold text-slate-900">POS Gym</h2>
         <p className="text-sm text-slate-600">Venta en mostrador: cobro inmediato, efectivo o cuenta del socio para débito automático.</p>
         <div className="mt-3 flex flex-wrap gap-2">
+          {[
+            { to: '/pos', label: 'Inicio' },
+            { to: '/pos/caja', label: 'Caja' },
+            { to: '/pos/ventas', label: 'Ventas' },
+            { to: '/pos/productos', label: 'Productos/Stock' },
+            { to: '/pos/control', label: 'Control' }
+          ].map((item) => (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              className={({ isActive }) =>
+                `rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+                  isActive
+                    ? 'bg-slate-900 text-white'
+                    : 'border border-slate-300 text-slate-700 hover:bg-slate-50'
+                }`
+              }
+              end={item.to === '/pos'}
+            >
+              {item.label}
+            </NavLink>
+          ))}
+        </div>
+        <div className="mt-3 flex flex-wrap gap-2">
           <button
             className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
             onClick={() => document.getElementById('pos-caja')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
@@ -1403,7 +1467,7 @@ ${sale.notes ? `Nota: ${sale.notes}` : ''}
         </div>
       </div>
 
-      <div className="grid gap-3 rounded-xl bg-white p-4 shadow-sm md:grid-cols-3">
+      <div id="pos-ventas" className="grid gap-3 rounded-xl bg-white p-4 shadow-sm md:grid-cols-3">
         <select
           className="rounded border border-slate-300 p-2"
           value={selectedProductId}
@@ -1456,7 +1520,7 @@ ${sale.notes ? `Nota: ${sale.notes}` : ''}
         </p>
       )}
 
-      <div className="grid gap-3 rounded-xl bg-white p-4 shadow-sm md:grid-cols-5">
+      <div id="pos-productos" className="grid gap-3 rounded-xl bg-white p-4 shadow-sm md:grid-cols-5">
         <input className="rounded border border-slate-300 p-2" placeholder="Código producto" value={newProduct.code} onChange={(e) => setNewProduct((s) => ({ ...s, code: e.target.value }))} />
         <input className="rounded border border-slate-300 p-2" placeholder="Nombre producto" value={newProduct.name} onChange={(e) => setNewProduct((s) => ({ ...s, name: e.target.value }))} />
         <input className="rounded border border-slate-300 p-2" type="number" min="0" step="0.01" placeholder="Precio" value={newProduct.price} onChange={(e) => setNewProduct((s) => ({ ...s, price: e.target.value }))} />
@@ -1466,7 +1530,7 @@ ${sale.notes ? `Nota: ${sale.notes}` : ''}
         </button>
       </div>
 
-      <div className="rounded-xl bg-white p-4 shadow-sm">
+      <div id="pos-control" className="rounded-xl bg-white p-4 shadow-sm">
         <div className="mb-2 flex items-center justify-between gap-2">
           <h3 className="text-lg font-semibold text-slate-900">Alertas de stock bajo</h3>
           <div className="flex items-center gap-2">
