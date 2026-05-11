@@ -508,9 +508,13 @@ export default function AdminBillingPage() {
     await loadData(next);
   };
 
-  const focusTenant = async (tenantId) => {
+  const focusTenant = async (tenantId, source = 'unknown') => {
     const parsedTenantId = String(tenantId ?? '').trim();
     if (!parsedTenantId) return;
+    trackEvent('sales_focus_tenant', 'admin_billing', {
+      tenant_id: Number(parsedTenantId),
+      source
+    });
     const next = { ...filters, tenant_id: parsedTenantId, page: 1 };
     setFilters(next);
     await Promise.all([loadData(next), loadTrackingSummary(next), loadGlobalComposite(next)]);
@@ -972,7 +976,7 @@ export default function AdminBillingPage() {
                     <div className="mt-1 flex gap-1">
                       <button
                         className="rounded border border-indigo-300 px-2 py-1 text-[11px] text-indigo-700"
-                        onClick={() => focusTenant(row.tenant_id)}
+                        onClick={() => focusTenant(row.tenant_id, 'daily_priority')}
                       >
                         Foco
                       </button>
@@ -1104,7 +1108,7 @@ export default function AdminBillingPage() {
               key={`quick-focus-${row.tenant_id}`}
               className="rounded border border-indigo-300 px-3 py-1 text-xs text-indigo-700 disabled:opacity-50"
               disabled={loading || trackingLoading}
-              onClick={() => focusTenant(row.tenant_id)}
+              onClick={() => focusTenant(row.tenant_id, 'quick_action')}
             >
               Ver tenant {row.tenant_id}
             </button>
@@ -1174,7 +1178,7 @@ export default function AdminBillingPage() {
                         <button
                           className="rounded border border-slate-300 px-2 py-1 text-xs text-slate-700 disabled:opacity-50"
                           disabled={loading || trackingLoading}
-                          onClick={() => focusTenant(row.tenant_id)}
+                          onClick={() => focusTenant(row.tenant_id, 'ranking_row')}
                         >
                           Ver detalle
                         </button>
