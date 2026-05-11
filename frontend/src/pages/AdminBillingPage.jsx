@@ -532,6 +532,18 @@ export default function AdminBillingPage() {
           setOpportunityThreshold(threshold);
         }
         setShowOnlyHighOpportunity(Boolean(parsed?.showOnlyHighOpportunity));
+        const sortBy = String(parsed?.rankingSortBy ?? 'score');
+        if (['score', 'clicks', 'checkouts', 'approved', 'checkout_to_approved_rate'].includes(sortBy)) {
+          setRankingSortBy(sortBy);
+        }
+        const sortDir = String(parsed?.rankingSortDir ?? 'desc');
+        if (['asc', 'desc'].includes(sortDir)) {
+          setRankingSortDir(sortDir);
+        }
+        const offer = String(parsed?.offerFilter ?? 'all');
+        if (['all', 'plan_scale', 'plan_pro', 'addon_whatsapp'].includes(offer)) {
+          setOfferFilter(offer);
+        }
       }
     } catch {
       // ignore invalid persisted prefs
@@ -543,12 +555,18 @@ export default function AdminBillingPage() {
     try {
       localStorage.setItem(
         OPPORTUNITY_PREFS_KEY,
-        JSON.stringify({ opportunityThreshold, showOnlyHighOpportunity })
+        JSON.stringify({
+          opportunityThreshold,
+          showOnlyHighOpportunity,
+          rankingSortBy,
+          rankingSortDir,
+          offerFilter
+        })
       );
     } catch {
       // non-blocking persistence
     }
-  }, [opportunityThreshold, showOnlyHighOpportunity]);
+  }, [opportunityThreshold, showOnlyHighOpportunity, rankingSortBy, rankingSortDir, offerFilter]);
 
   useEffect(() => {
     loadData(filters);
