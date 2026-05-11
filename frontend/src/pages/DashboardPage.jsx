@@ -4,8 +4,16 @@ import { fetchDashboardMetrics } from '../services/dashboardService';
 import { trackEvent } from '../services/trackingService';
 import { useAuthStore } from '../stores/authStore';
 
+function inferHudRole(permissions = []) {
+  const has = (p) => Array.isArray(permissions) && permissions.includes(p);
+  if (has('subscriptions.manage') || has('reports.read')) return { code: 'manager', label: 'Gerente' };
+  if (has('attendance.write') || has('members.write') || has('payments.write')) return { code: 'reception', label: 'Recepción' };
+  return { code: 'operator', label: 'Operador' };
+}
+
 export default function DashboardPage() {
   const user = useAuthStore((state) => state.user);
+  const hasPermission = useAuthStore((state) => state.hasPermission);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [metrics, setMetrics] = useState({
@@ -21,6 +29,8 @@ export default function DashboardPage() {
       limits_health: { max_percent: 0, risk: 'low', items: [] }
     }
   });
+  const permissions = user?.permissions ?? [];
+  const hudRole = inferHudRole(permissions);
 
   useEffect(() => {
     const run = async () => {
@@ -44,6 +54,41 @@ export default function DashboardPage() {
     { label: 'Ingresos del mes', value: `${metrics.currency} ${Number(metrics.revenue_month).toLocaleString('es-AR')}` },
     { label: 'Asistencias hoy', value: metrics.attendance_today }
   ];
+  const operationalWidgets = [
+    {
+      label: 'Check-ins en tiempo real',
+      value: loading ? '...' : metrics.attendance_today,
+      hint: 'Flujo actual de ingresos',
+      tone: 'border-emerald-200 bg-emerald-50'
+    },
+    {
+      label: 'Reservas próximas',
+      value: loading ? '...' : Math.max(0, Math.round(Number(metrics.attendance_today || 0) * 0.6)),
+      hint: 'Estimación operativa próxima hora',
+      tone: 'border-sky-200 bg-sky-50'
+    },
+    {
+      label: 'Alertas de capacidad',
+      value: loading ? '...' : (Number(metrics.attendance_today || 0) > 120 ? 'Alta' : 'Normal'),
+      hint: 'Monitoreo de aforo',
+      tone: Number(metrics.attendance_today || 0) > 120 ? 'border-rose-200 bg-rose-50' : 'border-amber-200 bg-amber-50'
+    },
+    {
+      label: 'Cobros del día',
+      value: loading ? '...' : `${metrics.currency} ${Math.round(Number(metrics.revenue_month || 0) / 30).toLocaleString('es-AR')}`,
+      hint: 'Caja estimada diaria',
+      tone: 'border-violet-200 bg-violet-50'
+    }
+  ];
+
+  const quickActions = [
+    { label: 'Check-in rápido', to: '/attendance', show: hasPermission('attendance.write') },
+    { label: 'Nueva membresía', to: '/memberships', show: hasPermission('memberships.write') },
+    { label: 'Registrar pago', to: '/payments', show: hasPermission('payments.write') },
+    { label: 'Ventas POS', to: '/pos', show: hasPermission('pos.read') || hasPermission('payments.read') },
+    { label: 'WhatsApp vencimientos', to: '/reminders', show: hasPermission('whatsapp.read') },
+    { label: 'Reportes rápidos', to: '/reports', show: hasPermission('reports.read') }
+  ].filter((item) => item.show);
 
   const plan = metrics.subscription ?? {};
   const health = plan.limits_health ?? { max_percent: 0, risk: 'low', items: [] };
@@ -60,6 +105,9 @@ export default function DashboardPage() {
         <div>
           <h2 className="text-2xl font-semibold">Dashboard</h2>
           <p className="text-slate-600">Bienvenido {user?.name ?? 'Usuario'}</p>
+          <p className="mt-1 inline-flex rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700">
+            HUD {hudRole.label}
+          </p>
         </div>
         <Link
           to="/billing/self-service"
@@ -93,6 +141,35 @@ export default function DashboardPage() {
             <p className="mt-2 text-2xl font-semibold">{loading ? '...' : card.value}</p>
           </article>
         ))}
+      </div>
+
+      <div className="rounded-xl bg-white p-4 shadow-sm">
+        <h3 className="text-lg font-semibold text-slate-900">Acciones rápidas</h3>
+        <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          {quickActions.map((action) => (
+            <Link
+              key={action.label}
+              to={action.to}
+              className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100"
+            >
+              {action.label}
+            </Link>
+          ))}
+          {quickActions.length === 0 && <p className="text-sm text-slate-500">Sin acciones disponibles para este rol.</p>}
+        </div>
+      </div>
+
+      <div className="rounded-xl bg-white p-4 shadow-sm">
+        <h3 className="text-lg font-semibold text-slate-900">Widgets diarios</h3>
+        <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          {operationalWidgets.map((widget) => (
+            <article key={widget.label} className={`rounded-lg border p-3 ${widget.tone}`}>
+              <p className="text-xs text-slate-600">{widget.label}</p>
+              <p className="mt-1 text-xl font-semibold text-slate-900">{widget.value}</p>
+              <p className="mt-1 text-xs text-slate-500">{widget.hint}</p>
+            </article>
+          ))}
+        </div>
       </div>
     </section>
   );
