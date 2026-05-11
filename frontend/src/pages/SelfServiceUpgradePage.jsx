@@ -8,6 +8,10 @@ function readCheckoutUrl(payload) {
   return payload?.checkout_url ?? payload?.url ?? payload?.checkoutUrl ?? '';
 }
 
+function normalizeActionSuffix(actionKey = '') {
+  return String(actionKey).trim().toLowerCase().replace(/[^a-z0-9]+/g, '_');
+}
+
 function statusBadgeClass(status) {
   const normalized = String(status || '').toLowerCase();
   if (normalized === 'active') return 'bg-emerald-100 text-emerald-800';
@@ -117,7 +121,7 @@ export default function SelfServiceUpgradePage() {
     loadData();
   }, [tenantId]);
 
-  const onUpgradePlan = async () => {
+  const onUpgradePlan = async (source = 'standard') => {
     if (!tenantId) return;
     setBillingAction('plan-pro');
     setError('');
@@ -129,9 +133,17 @@ export default function SelfServiceUpgradePage() {
       trackEvent('checkout_created', 'self_service_upgrade', {
         scope: 'plan',
         plan_code: 'pro',
+        source,
         tenant_id: Number(tenantId || 0),
         has_url: Boolean(url)
       });
+      if (source === 'recommended') {
+        trackEvent('checkout_created_recommended_plan_pro', 'self_service_upgrade', {
+          action_key: 'plan-pro',
+          tenant_id: Number(tenantId || 0),
+          has_url: Boolean(url)
+        });
+      }
       setCheckoutUrl(url);
       setMessage(url ? 'Checkout Pro generado. Completa el pago para activar.' : 'Checkout generado sin URL visible.');
     } catch (err) {
@@ -141,7 +153,7 @@ export default function SelfServiceUpgradePage() {
     }
   };
 
-  const onUpgradeScale = async () => {
+  const onUpgradeScale = async (source = 'standard') => {
     if (!tenantId) return;
     setBillingAction('plan-scale');
     setError('');
@@ -153,9 +165,17 @@ export default function SelfServiceUpgradePage() {
       trackEvent('checkout_created', 'self_service_upgrade', {
         scope: 'plan',
         plan_code: 'scale',
+        source,
         tenant_id: Number(tenantId || 0),
         has_url: Boolean(url)
       });
+      if (source === 'recommended') {
+        trackEvent('checkout_created_recommended_plan_scale', 'self_service_upgrade', {
+          action_key: 'plan-scale',
+          tenant_id: Number(tenantId || 0),
+          has_url: Boolean(url)
+        });
+      }
       setCheckoutUrl(url);
       setMessage(url ? 'Checkout Scale generado. Completa el pago para activar.' : 'Checkout generado sin URL visible.');
     } catch (err) {
@@ -165,7 +185,7 @@ export default function SelfServiceUpgradePage() {
     }
   };
 
-  const onUpgradeAddon = async (addonCode) => {
+  const onUpgradeAddon = async (addonCode, source = 'standard') => {
     if (!tenantId || !addonCode) return;
     setBillingAction(`addon-${addonCode}`);
     setError('');
@@ -177,9 +197,18 @@ export default function SelfServiceUpgradePage() {
       trackEvent('checkout_created', 'self_service_upgrade', {
         scope: 'addon',
         addon_code: addonCode,
+        source,
         tenant_id: Number(tenantId || 0),
         has_url: Boolean(url)
       });
+      if (source === 'recommended') {
+        trackEvent(`checkout_created_recommended_addon_${normalizeActionSuffix(addonCode)}`, 'self_service_upgrade', {
+          action_key: `addon-${addonCode}`,
+          addon_code: addonCode,
+          tenant_id: Number(tenantId || 0),
+          has_url: Boolean(url)
+        });
+      }
       setCheckoutUrl(url);
       setMessage(url ? `Checkout para add-on ${addonCode} generado.` : 'Checkout generado sin URL visible.');
     } catch (err) {
@@ -187,6 +216,33 @@ export default function SelfServiceUpgradePage() {
     } finally {
       setBillingAction('');
     }
+  };
+
+  const onRecommendedActionClick = () => {
+    if (!recommendedAction) return;
+    const actionKey = String(recommendedAction.actionKey || '');
+    const actionSuffix = normalizeActionSuffix(actionKey);
+    trackEvent('upgrade_recommended_cta_click', 'self_service_upgrade', {
+      action_key: actionKey,
+      action_type: recommendedAction.type,
+      top_limit_key: topUsageItem?.limitKey ?? null,
+      top_usage_percent: Number(topUsageItem?.percent ?? 0),
+      tenant_id: Number(tenantId || 0)
+    });
+    trackEvent(`upgrade_recommended_cta_click_${actionSuffix}`, 'self_service_upgrade', {
+      action_key: actionKey,
+      action_type: recommendedAction.type,
+      tenant_id: Number(tenantId || 0)
+    });
+    if (recommendedAction.type === 'addon' && recommendedAction.addonCode) {
+      onUpgradeAddon(recommendedAction.addonCode, 'recommended');
+      return;
+    }
+    if (recommendedAction.actionKey === 'plan-scale') {
+      onUpgradeScale('recommended');
+      return;
+    }
+    onUpgradePlan('recommended');
   };
 
   return (
@@ -249,17 +305,7 @@ export default function SelfServiceUpgradePage() {
               <button
                 className="mt-2 rounded-lg bg-indigo-600 px-3 py-1 text-sm font-semibold text-white disabled:opacity-50"
                 disabled={billingAction === recommendedAction.actionKey}
-                onClick={() => {
-                  if (recommendedAction.type === 'addon' && recommendedAction.addonCode) {
-                    onUpgradeAddon(recommendedAction.addonCode);
-                    return;
-                  }
-                  if (recommendedAction.actionKey === 'plan-scale') {
-                    onUpgradeScale();
-                    return;
-                  }
-                  onUpgradePlan();
-                }}
+                onClick={onRecommendedActionClick}
               >
                 {billingAction === recommendedAction.actionKey ? 'Generando checkout...' : recommendedAction.label}
               </button>

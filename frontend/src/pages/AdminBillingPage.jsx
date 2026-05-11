@@ -55,9 +55,15 @@ function toMoney(amount, currency = 'USD') {
 const TRACKING_EVENTS = [
   { key: 'upgrade_banner_click', label: 'Banner click' },
   { key: 'upgrade_badge_click', label: 'Badge click' },
-  { key: 'upgrade_pay_now_click', label: 'Pay now click' }
+  { key: 'upgrade_pay_now_click', label: 'Pay now click' },
+  { key: 'upgrade_recommended_cta_click', label: 'Recommended CTA click' }
 ];
 const MIN_SAMPLE_CHECKOUTS = 10;
+const RECOMMENDED_CTA_FLOWS = [
+  { key: 'plan_pro', label: 'Plan Pro' },
+  { key: 'plan_scale', label: 'Plan Scale' },
+  { key: 'addon_whatsapp', label: 'Add-on WhatsApp' }
+];
 
 function normalizeTrackingSummary(payload) {
   const totals = payload?.event_totals ?? payload?.totals ?? payload?.events ?? {};
@@ -74,10 +80,12 @@ function normalizeTrackingSummary(payload) {
     totals: {
       upgrade_banner_click: toInt(totals?.upgrade_banner_click ?? 0),
       upgrade_badge_click: toInt(totals?.upgrade_badge_click ?? 0),
-      upgrade_pay_now_click: toInt(totals?.upgrade_pay_now_click ?? 0)
+      upgrade_pay_now_click: toInt(totals?.upgrade_pay_now_click ?? 0),
+      upgrade_recommended_cta_click: toInt(totals?.upgrade_recommended_cta_click ?? 0)
     },
     daily,
-    byContext: payload?.by_context ?? {}
+    byContext: payload?.by_context ?? {},
+    rawTotals: totals
   };
 }
 
@@ -85,7 +93,8 @@ function buildCompositeKpi(funnelData, trackingData) {
   const clicks =
     toInt(trackingData?.totals?.upgrade_banner_click) +
     toInt(trackingData?.totals?.upgrade_badge_click) +
-    toInt(trackingData?.totals?.upgrade_pay_now_click);
+    toInt(trackingData?.totals?.upgrade_pay_now_click) +
+    toInt(trackingData?.totals?.upgrade_recommended_cta_click);
   const checkoutSessions = toInt(funnelData?.total_sessions);
   const approved = toInt(funnelData?.approved_sessions);
   const ctrUpgrade = checkoutSessions > 0 ? (clicks / checkoutSessions) * 100 : 0;
@@ -102,7 +111,8 @@ function buildContextKpi(contextTotals = {}) {
   const clicks =
     toInt(contextTotals?.upgrade_banner_click) +
     toInt(contextTotals?.upgrade_badge_click) +
-    toInt(contextTotals?.upgrade_pay_now_click);
+    toInt(contextTotals?.upgrade_pay_now_click) +
+    toInt(contextTotals?.upgrade_recommended_cta_click);
   const checkoutSessions = toInt(contextTotals?.checkout_created);
   const approved = toInt(contextTotals?.approved);
   const ctrUpgrade = checkoutSessions > 0 ? (clicks / checkoutSessions) * 100 : 0;
@@ -362,6 +372,18 @@ export default function AdminBillingPage() {
     () => buildContextKpi(trackingSummary.byContext?.self_service_upgrade ?? {}),
     [trackingSummary.byContext]
   );
+  const recommendedCtaKpis = useMemo(
+    () =>
+      RECOMMENDED_CTA_FLOWS.map((flow) => {
+        const clickKey = `upgrade_recommended_cta_click_${flow.key}`;
+        const checkoutKey = `checkout_created_recommended_${flow.key}`;
+        const clicks = toInt(trackingSummary.rawTotals?.[clickKey] ?? 0);
+        const checkouts = toInt(trackingSummary.rawTotals?.[checkoutKey] ?? 0);
+        const conversion = clicks > 0 ? (checkouts / clicks) * 100 : 0;
+        return { ...flow, clicks, checkouts, conversion };
+      }),
+    [trackingSummary.rawTotals]
+  );
   const rankingRows = useMemo(() => {
     const sorted = [...tenantRanking].sort((a, b) => buildOpportunityScore(b) - buildOpportunityScore(a));
     if (!showOnlyHighOpportunity) return sorted;
@@ -553,6 +575,22 @@ export default function AdminBillingPage() {
               </p>
             )}
           </article>
+        </div>
+      </div>
+
+      <div className="space-y-3 rounded-xl bg-white p-4 shadow-sm">
+        <h3 className="text-lg font-semibold text-slate-900">Conversión CTA recomendado</h3>
+        <div className="grid gap-3 md:grid-cols-3">
+          {recommendedCtaKpis.map((item) => (
+            <article key={item.key} className="rounded-lg border border-slate-200 p-3">
+              <p className="text-sm text-slate-500">{item.label}</p>
+              <p className="mt-1 text-sm text-slate-700">
+                Clicks: <span className="font-semibold">{item.clicks}</span> · Checkouts: <span className="font-semibold">{item.checkouts}</span>
+              </p>
+              <p className="mt-2 text-xl font-semibold text-slate-900">{item.conversion.toFixed(2)}%</p>
+              <p className="text-xs text-slate-500">Checkout / Click</p>
+            </article>
+          ))}
         </div>
       </div>
 
