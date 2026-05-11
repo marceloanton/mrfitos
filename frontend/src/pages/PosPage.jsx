@@ -34,6 +34,7 @@ export default function PosPage() {
   const [message, setMessage] = useState('');
   const [showCollectionsHub, setShowCollectionsHub] = useState(false);
   const [showRiskHub, setShowRiskHub] = useState(false);
+  const [receptionMode, setReceptionMode] = useState(true);
   const [sales, setSales] = useState([]);
   const [charges, setCharges] = useState([]);
   const [autoSettleMethod, setAutoSettleMethod] = useState('transfer');
@@ -154,6 +155,9 @@ export default function PosPage() {
   const rankingFiltersHydratedRef = useRef(false);
   const collectorPrefsStorageKey = user
     ? `pos-collector-ranking-prefs-v1:${user.id || user.email || 'user'}:${user.gym_id || 'gym'}`
+    : null;
+  const receptionModeStorageKey = user
+    ? `pos-reception-mode-v1:${user.id || user.email || 'user'}:${user.gym_id || 'gym'}`
     : null;
   const toFriendlyApiError = (err, fallbackMessage) => {
     const apiMessage = err?.response?.data?.message;
@@ -359,9 +363,32 @@ export default function PosPage() {
   };
 
   useEffect(() => {
+    if (!receptionModeStorageKey) return;
+    try {
+      const raw = localStorage.getItem(receptionModeStorageKey);
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      if (typeof parsed?.enabled === 'boolean') {
+        setReceptionMode(parsed.enabled);
+      }
+    } catch {
+      // ignore corrupted localStorage
+    }
+  }, [receptionModeStorageKey]);
+
+  useEffect(() => {
+    if (!receptionModeStorageKey) return;
+    try {
+      localStorage.setItem(receptionModeStorageKey, JSON.stringify({ enabled: receptionMode }));
+    } catch {
+      // ignore write failures
+    }
+  }, [receptionModeStorageKey, receptionMode]);
+
+  useEffect(() => {
     const path = location.pathname;
     if (path === '/pos/control') {
-      setShowCollectionsHub(true);
+      setShowCollectionsHub(!receptionMode);
       setShowRiskHub(true);
       window.setTimeout(() => {
         document.getElementById('pos-control')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -369,7 +396,7 @@ export default function PosPage() {
       return;
     }
     if (path === '/pos/caja') {
-      setShowCollectionsHub(false);
+      setShowCollectionsHub(!receptionMode);
       setShowRiskHub(false);
       window.setTimeout(() => {
         document.getElementById('pos-caja')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -377,7 +404,7 @@ export default function PosPage() {
       return;
     }
     if (path === '/pos/ventas') {
-      setShowCollectionsHub(false);
+      setShowCollectionsHub(!receptionMode);
       setShowRiskHub(false);
       window.setTimeout(() => {
         document.getElementById('pos-ventas')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -385,16 +412,16 @@ export default function PosPage() {
       return;
     }
     if (path === '/pos/productos') {
-      setShowCollectionsHub(false);
+      setShowCollectionsHub(!receptionMode);
       setShowRiskHub(false);
       window.setTimeout(() => {
         document.getElementById('pos-productos')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }, 30);
       return;
     }
-    setShowCollectionsHub(false);
+    setShowCollectionsHub(!receptionMode);
     setShowRiskHub(false);
-  }, [location.pathname]);
+  }, [location.pathname, receptionMode]);
 
   useEffect(() => {
     const onKeyDown = (event) => {
@@ -1180,6 +1207,16 @@ ${sale.notes ? `Nota: ${sale.notes}` : ''}
         </p>
         <div className="mt-3 flex flex-wrap gap-2">
           <button
+            className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+              receptionMode
+                ? 'bg-emerald-600 text-white'
+                : 'border border-slate-300 text-slate-700 hover:bg-slate-50'
+            }`}
+            onClick={() => setReceptionMode((v) => !v)}
+          >
+            {receptionMode ? 'Modo Recepción: ON' : 'Modo Recepción: OFF'}
+          </button>
+          <button
             className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
             onClick={() => document.getElementById('pos-caja')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
           >
@@ -1194,12 +1231,14 @@ ${sale.notes ? `Nota: ${sale.notes}` : ''}
           <button
             className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
             onClick={() => setShowCollectionsHub((v) => !v)}
+            disabled={receptionMode}
           >
             {showCollectionsHub ? 'Ocultar cobranza avanzada' : 'Mostrar cobranza avanzada'}
           </button>
           <button
             className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
             onClick={() => setShowRiskHub((v) => !v)}
+            disabled={receptionMode && location.pathname !== '/pos/control'}
           >
             {showRiskHub ? 'Ocultar riesgo y auditoría' : 'Mostrar riesgo y auditoría'}
           </button>
