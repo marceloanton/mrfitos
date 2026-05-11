@@ -8,6 +8,7 @@ import { resolveHudRole } from '../utils/roleProfile';
 export default function DashboardPage() {
   const user = useAuthStore((state) => state.user);
   const hasPermission = useAuthStore((state) => state.hasPermission);
+  const capabilities = user?.capabilities ?? {};
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [metrics, setMetrics] = useState({
@@ -78,9 +79,9 @@ export default function DashboardPage() {
     { label: 'Check-in rápido', to: '/attendance', show: hasPermission('attendance.write') },
     { label: 'Nueva membresía', to: '/memberships', show: hasPermission('memberships.write') },
     { label: 'Registrar pago', to: '/payments', show: hasPermission('payments.write') },
-    { label: 'Ventas POS', to: '/pos', show: hasPermission('pos.read') || hasPermission('payments.read') },
+    { label: 'Ventas POS', to: '/pos', show: typeof capabilities.pos === 'boolean' ? capabilities.pos : (hasPermission('pos.read') || hasPermission('payments.read')) },
     { label: 'WhatsApp vencimientos', to: '/reminders', show: hasPermission('whatsapp.read') },
-    { label: 'Reportes rápidos', to: '/reports', show: hasPermission('reports.read') }
+    { label: 'Reportes rápidos', to: '/reports', show: typeof capabilities.reports === 'boolean' ? capabilities.reports : hasPermission('reports.read') }
   ].filter((item) => item.show);
 
   const plan = metrics.subscription ?? {};

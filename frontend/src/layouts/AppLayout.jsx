@@ -12,7 +12,10 @@ export default function AppLayout() {
   const switchingGym = useAuthStore((state) => state.switchingGym);
   const user = useAuthStore((state) => state.user);
   const hasPermission = useAuthStore((state) => state.hasPermission);
-  const canPosRead = hasPermission('pos.read') || hasPermission('payments.read');
+  const capabilities = user?.capabilities ?? {};
+  const canPosRead = typeof capabilities.pos === 'boolean'
+    ? capabilities.pos
+    : (hasPermission('pos.read') || hasPermission('payments.read'));
   const isManagement = resolveManagementFlag(user);
   const token = useAuthStore((state) => state.token);
   const availableGyms = Array.isArray(user?.available_gyms) ? user.available_gyms : [];
@@ -103,14 +106,14 @@ export default function AppLayout() {
           <div className="flex items-center gap-2">
             <NavLink to="/dashboard" className="rounded px-3 py-2 text-sm hover:bg-slate-100">Dashboard</NavLink>
             {!receptionNavMode && <NavLink to="/pricing" className="rounded px-3 py-2 text-sm hover:bg-slate-100">Precios</NavLink>}
-            {hasPermission('members.read') && <NavLink to="/members" className="rounded px-3 py-2 text-sm hover:bg-slate-100">Socios</NavLink>}
+            {(typeof capabilities.members === 'boolean' ? capabilities.members : hasPermission('members.read')) && <NavLink to="/members" className="rounded px-3 py-2 text-sm hover:bg-slate-100">Socios</NavLink>}
             {!receptionNavMode && hasPermission('plans.read') && <NavLink to="/plans" className="rounded px-3 py-2 text-sm hover:bg-slate-100">Planes</NavLink>}
             {!receptionNavMode && hasPermission('memberships.read') && <NavLink to="/memberships" className="rounded px-3 py-2 text-sm hover:bg-slate-100">Membresias</NavLink>}
-            {hasPermission('payments.read') && <NavLink to="/payments" className="rounded px-3 py-2 text-sm hover:bg-slate-100">Pagos</NavLink>}
+            {(typeof capabilities.payments === 'boolean' ? capabilities.payments : hasPermission('payments.read')) && <NavLink to="/payments" className="rounded px-3 py-2 text-sm hover:bg-slate-100">Pagos</NavLink>}
             {canPosRead && <NavLink to="/pos" className="rounded px-3 py-2 text-sm hover:bg-slate-100">POS</NavLink>}
-            {hasPermission('attendance.read') && <NavLink to="/attendance" className="rounded px-3 py-2 text-sm hover:bg-slate-100">Asistencia</NavLink>}
+            {(typeof capabilities.attendance === 'boolean' ? capabilities.attendance : hasPermission('attendance.read')) && <NavLink to="/attendance" className="rounded px-3 py-2 text-sm hover:bg-slate-100">Asistencia</NavLink>}
             {hasPermission('whatsapp.read') && <NavLink to="/reminders" className="rounded px-3 py-2 text-sm hover:bg-slate-100">WhatsApp</NavLink>}
-            {!receptionNavMode && hasPermission('reports.read') && <NavLink to="/reports" className="rounded px-3 py-2 text-sm hover:bg-slate-100">Reportes</NavLink>}
+            {!receptionNavMode && (typeof capabilities.reports === 'boolean' ? capabilities.reports : hasPermission('reports.read')) && <NavLink to="/reports" className="rounded px-3 py-2 text-sm hover:bg-slate-100">Reportes</NavLink>}
             {!receptionNavMode && <NavLink to="/operational-guide" className="rounded px-3 py-2 text-sm hover:bg-slate-100">Guía Operativa</NavLink>}
             {!receptionNavMode && hasPermission('subscriptions.manage') && <NavLink to="/admin/subscriptions" className="rounded px-3 py-2 text-sm hover:bg-slate-100">Admin Suscripción</NavLink>}
             {!receptionNavMode && hasPermission('subscriptions.manage') && <NavLink to="/admin/billing" className="rounded px-3 py-2 text-sm hover:bg-slate-100">Admin Billing</NavLink>}

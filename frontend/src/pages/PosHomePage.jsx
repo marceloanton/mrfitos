@@ -1,8 +1,12 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { getOpenCashSessionSummary, getPosSummary } from '../services/posService';
+import { useAuthStore } from '../stores/authStore';
 
 export default function PosHomePage() {
+  const user = useAuthStore((state) => state.user);
+  const capabilities = user?.capabilities ?? {};
+  const canSeeControl = typeof capabilities.management === 'boolean' ? capabilities.management : true;
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [summary, setSummary] = useState({
@@ -113,16 +117,18 @@ export default function PosHomePage() {
           <h3 className="text-xl font-semibold text-slate-900">Productos y Stock</h3>
           <p className="text-sm text-slate-600">Alta de productos, alertas de stock y movimientos.</p>
         </Link>
-        <Link
-          to="/pos/control"
-          onMouseEnter={prefetchPosRuntime}
-          onFocus={prefetchPosRuntime}
-          className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-slate-400 hover:bg-slate-50"
-        >
-          <p className="text-xs uppercase tracking-wide text-slate-500">Backoffice</p>
-          <h3 className="text-xl font-semibold text-slate-900">Control y Riesgo</h3>
-          <p className="text-sm text-slate-600">Auditoría, alertas críticas y seguimiento operativo.</p>
-        </Link>
+        {canSeeControl && (
+          <Link
+            to="/pos/control"
+            onMouseEnter={prefetchPosRuntime}
+            onFocus={prefetchPosRuntime}
+            className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-slate-400 hover:bg-slate-50"
+          >
+            <p className="text-xs uppercase tracking-wide text-slate-500">Backoffice</p>
+            <h3 className="text-xl font-semibold text-slate-900">Control y Riesgo</h3>
+            <p className="text-sm text-slate-600">Auditoría, alertas críticas y seguimiento operativo.</p>
+          </Link>
+        )}
       </div>
     </section>
   );
