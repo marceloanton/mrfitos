@@ -38,10 +38,9 @@ DELETE FROM payments
 WHERE external_reference LIKE 'DEMO-%';
 
 DELETE FROM memberships
-WHERE created_at >= NOW() - INTERVAL 1 DAY
-  AND member_id IN (
-    SELECT id FROM members WHERE member_code LIKE 'DEMO-%'
-  );
+WHERE member_id IN (
+  SELECT id FROM members WHERE member_code LIKE 'DEMO-%'
+);
 
 DELETE FROM members
 WHERE member_code LIKE 'DEMO-%';
