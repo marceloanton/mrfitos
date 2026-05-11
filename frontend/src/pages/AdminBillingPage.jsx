@@ -414,6 +414,12 @@ export default function AdminBillingPage() {
     await Promise.all([loadData(next), loadTrackingSummary(next), loadGlobalComposite(next)]);
   };
 
+  const clearTenantFocus = async () => {
+    const next = { ...filters, tenant_id: '', page: 1 };
+    setFilters(next);
+    await Promise.all([loadData(next), loadTrackingSummary(next), loadGlobalComposite(next)]);
+  };
+
   useEffect(() => {
     try {
       const raw = localStorage.getItem(OPPORTUNITY_PREFS_KEY);
@@ -552,6 +558,15 @@ export default function AdminBillingPage() {
         </select>
         <button className="rounded border border-slate-300 p-2 disabled:opacity-50" disabled={loading} onClick={onSubmitFilters}>
           {loading ? 'Consultando...' : 'Consultar'}
+        </button>
+      </div>
+      <div className="flex flex-wrap gap-2 rounded-xl bg-white p-3 shadow-sm">
+        <button
+          className="rounded border border-slate-300 px-3 py-1 text-xs disabled:opacity-50"
+          disabled={loading || trackingLoading || !hasTenantFilter}
+          onClick={clearTenantFocus}
+        >
+          Limpiar foco tenant
         </button>
       </div>
       <div className="flex flex-wrap gap-2 rounded-xl bg-white p-3 shadow-sm">
