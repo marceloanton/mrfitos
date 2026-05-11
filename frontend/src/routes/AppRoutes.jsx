@@ -7,6 +7,7 @@ import MembersPage from '../pages/MembersPage';
 import MembershipsPage from '../pages/MembershipsPage';
 import PaymentsPage from '../pages/PaymentsPage';
 import PosPage from '../pages/PosPage';
+import PosHomePage from '../pages/PosHomePage';
 import PlansPage from '../pages/PlansPage';
 import RemindersPage from '../pages/RemindersPage';
 import ReportsPage from '../pages/ReportsPage';
@@ -45,7 +46,7 @@ export default function AppRoutes() {
             <Route path="/memberships" element={<MembershipsPage />} />
           </Route>
           <Route element={<PermissionRoute permissions={['pos.read', 'payments.read']} />}>
-            <Route path="/pos" element={<PosPage />} />
+            <Route path="/pos" element={<PosHomePage />} />
             <Route path="/pos/caja" element={<PosPage />} />
             <Route path="/pos/ventas" element={<PosPage />} />
             <Route path="/pos/productos" element={<PosPage />} />
