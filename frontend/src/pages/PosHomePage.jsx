@@ -33,6 +33,20 @@ export default function PosHomePage() {
     run();
   }, []);
 
+  useEffect(() => {
+    let timer = null;
+    timer = window.setTimeout(() => {
+      import('./PosPage');
+    }, 300);
+    return () => {
+      if (timer) window.clearTimeout(timer);
+    };
+  }, []);
+
+  const prefetchPosRuntime = () => {
+    import('./PosPage');
+  };
+
   return (
     <section className="space-y-4">
       <div className="rounded-2xl border border-slate-200 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 p-5 text-white shadow-sm">
@@ -69,22 +83,42 @@ export default function PosHomePage() {
       </div>
 
       <div className="grid gap-3 md:grid-cols-2">
-        <Link to="/pos/caja" className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-slate-400 hover:bg-slate-50">
+        <Link
+          to="/pos/caja"
+          onMouseEnter={prefetchPosRuntime}
+          onFocus={prefetchPosRuntime}
+          className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-slate-400 hover:bg-slate-50"
+        >
           <p className="text-xs uppercase tracking-wide text-slate-500">Turno</p>
           <h3 className="text-xl font-semibold text-slate-900">Caja</h3>
           <p className="text-sm text-slate-600">Abrir/cerrar caja, cierre Z y resumen por operador.</p>
         </Link>
-        <Link to="/pos/ventas" className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-slate-400 hover:bg-slate-50">
+        <Link
+          to="/pos/ventas"
+          onMouseEnter={prefetchPosRuntime}
+          onFocus={prefetchPosRuntime}
+          className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-slate-400 hover:bg-slate-50"
+        >
           <p className="text-xs uppercase tracking-wide text-slate-500">Mostrador</p>
           <h3 className="text-xl font-semibold text-slate-900">Ventas</h3>
           <p className="text-sm text-slate-600">Crear venta, ticket, reimpresión y anulaciones.</p>
         </Link>
-        <Link to="/pos/productos" className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-slate-400 hover:bg-slate-50">
+        <Link
+          to="/pos/productos"
+          onMouseEnter={prefetchPosRuntime}
+          onFocus={prefetchPosRuntime}
+          className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-slate-400 hover:bg-slate-50"
+        >
           <p className="text-xs uppercase tracking-wide text-slate-500">Inventario</p>
           <h3 className="text-xl font-semibold text-slate-900">Productos y Stock</h3>
           <p className="text-sm text-slate-600">Alta de productos, alertas de stock y movimientos.</p>
         </Link>
-        <Link to="/pos/control" className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-slate-400 hover:bg-slate-50">
+        <Link
+          to="/pos/control"
+          onMouseEnter={prefetchPosRuntime}
+          onFocus={prefetchPosRuntime}
+          className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-slate-400 hover:bg-slate-50"
+        >
           <p className="text-xs uppercase tracking-wide text-slate-500">Backoffice</p>
           <h3 className="text-xl font-semibold text-slate-900">Control y Riesgo</h3>
           <p className="text-sm text-slate-600">Auditoría, alertas críticas y seguimiento operativo.</p>
@@ -93,4 +127,3 @@ export default function PosHomePage() {
     </section>
   );
 }
-
