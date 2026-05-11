@@ -18,6 +18,7 @@ import SelfServiceUpgradePage from '../pages/SelfServiceUpgradePage';
 import BillingSuccessPage from '../pages/BillingSuccessPage';
 import BillingFailurePage from '../pages/BillingFailurePage';
 import BillingPendingPage from '../pages/BillingPendingPage';
+import OperationalGuidePage from '../pages/OperationalGuidePage';
 import PermissionRoute from './PermissionRoute';
 import ProtectedRoute from './ProtectedRoute';
 
@@ -58,6 +59,7 @@ export default function AppRoutes() {
           <Route element={<PermissionRoute permission="reports.read" />}>
             <Route path="/reports" element={<ReportsPage />} />
           </Route>
+          <Route path="/operational-guide" element={<OperationalGuidePage />} />
           <Route element={<PermissionRoute permission="subscriptions.manage" />}>
             <Route path="/admin/subscription" element={<AdminSubscriptionPage />} />
             <Route path="/admin/subscriptions" element={<AdminSubscriptionPage />} />

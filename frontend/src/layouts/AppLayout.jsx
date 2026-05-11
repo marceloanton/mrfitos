@@ -60,6 +60,7 @@ export default function AppLayout() {
             {hasPermission('attendance.read') && <NavLink to="/attendance" className="rounded px-3 py-2 text-sm hover:bg-slate-100">Asistencia</NavLink>}
             {hasPermission('whatsapp.read') && <NavLink to="/reminders" className="rounded px-3 py-2 text-sm hover:bg-slate-100">WhatsApp</NavLink>}
             {hasPermission('reports.read') && <NavLink to="/reports" className="rounded px-3 py-2 text-sm hover:bg-slate-100">Reportes</NavLink>}
+            <NavLink to="/operational-guide" className="rounded px-3 py-2 text-sm hover:bg-slate-100">Guía Operativa</NavLink>
             {hasPermission('subscriptions.manage') && <NavLink to="/admin/subscriptions" className="rounded px-3 py-2 text-sm hover:bg-slate-100">Admin Suscripción</NavLink>}
             {hasPermission('subscriptions.manage') && <NavLink to="/admin/billing" className="rounded px-3 py-2 text-sm hover:bg-slate-100">Admin Billing</NavLink>}
             {hasPermission('subscriptions.manage.catalog') && <NavLink to="/admin/modules" className="rounded px-3 py-2 text-sm hover:bg-slate-100">Admin Módulos</NavLink>}
