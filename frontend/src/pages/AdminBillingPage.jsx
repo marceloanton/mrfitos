@@ -350,6 +350,14 @@ export default function AdminBillingPage() {
     await loadData(next);
   };
 
+  const focusTenant = async (tenantId) => {
+    const parsedTenantId = String(tenantId ?? '').trim();
+    if (!parsedTenantId) return;
+    const next = { ...filters, tenant_id: parsedTenantId, page: 1 };
+    setFilters(next);
+    await Promise.all([loadData(next), loadTrackingSummary(next), loadGlobalComposite(next)]);
+  };
+
   useEffect(() => {
     loadData(filters);
     loadTrackingSummary(filters);
@@ -620,6 +628,16 @@ export default function AdminBillingPage() {
           >
             Copiar IDs prioritarios ({highOpportunityRows.length})
           </button>
+          {highOpportunityRows.slice(0, 3).map((row) => (
+            <button
+              key={`quick-focus-${row.tenant_id}`}
+              className="rounded border border-indigo-300 px-3 py-1 text-xs text-indigo-700 disabled:opacity-50"
+              disabled={loading || trackingLoading}
+              onClick={() => focusTenant(row.tenant_id)}
+            >
+              Ver tenant {row.tenant_id}
+            </button>
+          ))}
         </div>
         {rankingError && <p className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{rankingError}</p>}
         <div className="overflow-x-auto rounded-lg border border-slate-200">
@@ -634,13 +652,14 @@ export default function AdminBillingPage() {
                 <th className="p-3">Checkout→Approved</th>
                 <th className="p-3">Click→Approved</th>
                 <th className="p-3">Oportunidad</th>
+                <th className="p-3">Acción</th>
               </tr>
             </thead>
             <tbody>
               {rankingLoading ? (
-                <tr><td className="p-3 text-slate-500" colSpan={8}>Cargando ranking...</td></tr>
+                <tr><td className="p-3 text-slate-500" colSpan={9}>Cargando ranking...</td></tr>
               ) : rankingRows.length === 0 ? (
-                <tr><td className="p-3 text-slate-500" colSpan={8}>Sin datos</td></tr>
+                <tr><td className="p-3 text-slate-500" colSpan={9}>Sin datos</td></tr>
               ) : (
                 rankingRows.map((row) => {
                   const score = buildOpportunityScore(row);
@@ -665,6 +684,15 @@ export default function AdminBillingPage() {
                       <span className={`rounded px-2 py-1 text-xs font-semibold ${highOpportunity ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-700'}`}>
                         {score}
                       </span>
+                    </td>
+                    <td className="p-3">
+                      <button
+                        className="rounded border border-slate-300 px-2 py-1 text-xs text-slate-700 disabled:opacity-50"
+                        disabled={loading || trackingLoading}
+                        onClick={() => focusTenant(row.tenant_id)}
+                      >
+                        Ver detalle
+                      </button>
                     </td>
                   </tr>
                 )})
