@@ -3,6 +3,7 @@ import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { fetchDashboardMetrics } from '../services/dashboardService';
 import { trackEvent } from '../services/trackingService';
 import { useAuthStore } from '../stores/authStore';
+import { isManagementProfile } from '../utils/roleProfile';
 
 export default function AppLayout() {
   const navigate = useNavigate();
@@ -11,8 +12,9 @@ export default function AppLayout() {
   const switchingGym = useAuthStore((state) => state.switchingGym);
   const user = useAuthStore((state) => state.user);
   const hasPermission = useAuthStore((state) => state.hasPermission);
+  const permissions = user?.permissions ?? [];
   const canPosRead = hasPermission('pos.read') || hasPermission('payments.read');
-  const isManagementProfile = hasPermission('subscriptions.manage') || hasPermission('reports.read');
+  const isManagement = isManagementProfile(permissions);
   const token = useAuthStore((state) => state.token);
   const availableGyms = Array.isArray(user?.available_gyms) ? user.available_gyms : [];
   const [riskBanner, setRiskBanner] = useState(null);
@@ -178,7 +180,7 @@ export default function AppLayout() {
         </div>
       )}
 
-      {!isManagementProfile && (
+      {!isManagement && (
         <div className="mx-auto flex max-w-7xl justify-end px-6 pt-3 print:hidden">
           <span
             className={`rounded-full px-3 py-1 text-xs font-semibold ${

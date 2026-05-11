@@ -3,13 +3,7 @@ import { Link } from 'react-router-dom';
 import { fetchDashboardMetrics } from '../services/dashboardService';
 import { trackEvent } from '../services/trackingService';
 import { useAuthStore } from '../stores/authStore';
-
-function inferHudRole(permissions = []) {
-  const has = (p) => Array.isArray(permissions) && permissions.includes(p);
-  if (has('subscriptions.manage') || has('reports.read')) return { code: 'manager', label: 'Gerente' };
-  if (has('attendance.write') || has('members.write') || has('payments.write')) return { code: 'reception', label: 'Recepción' };
-  return { code: 'operator', label: 'Operador' };
-}
+import { inferHudRole } from '../utils/roleProfile';
 
 export default function DashboardPage() {
   const user = useAuthStore((state) => state.user);
