@@ -56,6 +56,44 @@ export default function SelfServiceUpgradePage() {
     () => usageItems.reduce((acc, item) => (item.percent > acc ? item.percent : acc), 0),
     [usageItems]
   );
+  const topUsageItem = useMemo(
+    () => usageItems.reduce((acc, item) => (!acc || item.percent > acc.percent ? item : acc), null),
+    [usageItems]
+  );
+  const whatsappAddon = useMemo(
+    () => (Array.isArray(addons) ? addons.find((addon) => String(addon.code || '').toLowerCase() === 'whatsapp') : null),
+    [addons]
+  );
+  const currentPlanCode = String(subscription?.plan_code ?? '').toLowerCase();
+  const recommendedAction = useMemo(() => {
+    if (!topUsageItem || topUsageItem.percent < 75) return null;
+    if (topUsageItem.limitKey === 'max_monthly_whatsapp_messages' && whatsappAddon && !whatsappAddon.active) {
+      return {
+        type: 'addon',
+        label: 'Activar add-on WhatsApp',
+        description: `Tu uso de ${topUsageItem.label.toLowerCase()} está al ${topUsageItem.percent}%.`,
+        actionKey: `addon-${whatsappAddon.code}`,
+        addonCode: whatsappAddon.code
+      };
+    }
+    if (currentPlanCode === 'free') {
+      return {
+        type: 'plan',
+        label: 'Upgrade a Pro',
+        description: `Tu uso de ${topUsageItem.label.toLowerCase()} está al ${topUsageItem.percent}%.`,
+        actionKey: 'plan-pro'
+      };
+    }
+    if (currentPlanCode === 'pro') {
+      return {
+        type: 'plan',
+        label: 'Upgrade a Scale',
+        description: `Tu uso de ${topUsageItem.label.toLowerCase()} está al ${topUsageItem.percent}%.`,
+        actionKey: 'plan-scale'
+      };
+    }
+    return null;
+  }, [topUsageItem, whatsappAddon, currentPlanCode]);
 
   const loadData = async () => {
     if (!tenantId) return;
@@ -98,6 +136,30 @@ export default function SelfServiceUpgradePage() {
       setMessage(url ? 'Checkout Pro generado. Completa el pago para activar.' : 'Checkout generado sin URL visible.');
     } catch (err) {
       setError(err?.response?.data?.message ?? 'No se pudo generar checkout de Pro.');
+    } finally {
+      setBillingAction('');
+    }
+  };
+
+  const onUpgradeScale = async () => {
+    if (!tenantId) return;
+    setBillingAction('plan-scale');
+    setError('');
+    setMessage('');
+    setCheckoutUrl('');
+    try {
+      const data = await createPlanCheckoutSession(tenantId, 'scale', 'self_service_upgrade');
+      const url = readCheckoutUrl(data);
+      trackEvent('checkout_created', 'self_service_upgrade', {
+        scope: 'plan',
+        plan_code: 'scale',
+        tenant_id: Number(tenantId || 0),
+        has_url: Boolean(url)
+      });
+      setCheckoutUrl(url);
+      setMessage(url ? 'Checkout Scale generado. Completa el pago para activar.' : 'Checkout generado sin URL visible.');
+    } catch (err) {
+      setError(err?.response?.data?.message ?? 'No se pudo generar checkout de Scale.');
     } finally {
       setBillingAction('');
     }
@@ -177,6 +239,30 @@ export default function SelfServiceUpgradePage() {
               <p className="text-sm font-semibold text-amber-800">
                 Estás usando {highestUsagePercent}% de tu plan. Recomendado: upgrade preventivo.
               </p>
+            </div>
+          )}
+
+          {recommendedAction && (
+            <div className="rounded-lg border border-indigo-200 bg-indigo-50 p-3">
+              <p className="text-sm font-semibold text-indigo-900">Acción recomendada</p>
+              <p className="text-sm text-indigo-800">{recommendedAction.description}</p>
+              <button
+                className="mt-2 rounded-lg bg-indigo-600 px-3 py-1 text-sm font-semibold text-white disabled:opacity-50"
+                disabled={billingAction === recommendedAction.actionKey}
+                onClick={() => {
+                  if (recommendedAction.type === 'addon' && recommendedAction.addonCode) {
+                    onUpgradeAddon(recommendedAction.addonCode);
+                    return;
+                  }
+                  if (recommendedAction.actionKey === 'plan-scale') {
+                    onUpgradeScale();
+                    return;
+                  }
+                  onUpgradePlan();
+                }}
+              >
+                {billingAction === recommendedAction.actionKey ? 'Generando checkout...' : recommendedAction.label}
+              </button>
             </div>
           )}
 
