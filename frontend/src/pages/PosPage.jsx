@@ -1214,16 +1214,15 @@ ${sale.notes ? `Nota: ${sale.notes}` : ''}
           Atajos: F2 Caja · F3 Ventas · F4 Productos · F8 Control
         </p>
         <div className="mt-3 flex flex-wrap gap-2">
-          <button
+          <span
             className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
               receptionMode
                 ? 'bg-emerald-600 text-white'
                 : 'border border-slate-300 text-slate-700 hover:bg-slate-50'
             }`}
-            onClick={() => setReceptionMode((v) => !v)}
           >
-            {receptionMode ? 'Modo Recepción: ON' : 'Modo Recepción: OFF'}
-          </button>
+            {receptionMode ? 'Modo Recepción activo' : 'Modo Recepción inactivo'}
+          </span>
           <button
             className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
             onClick={() => document.getElementById('pos-caja')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
