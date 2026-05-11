@@ -628,6 +628,12 @@ export default function AdminBillingPage() {
     () => (salesOpsFocusCount > 0 ? (salesOpsCheckoutCreated / salesOpsFocusCount) * 100 : 0),
     [salesOpsFocusCount, salesOpsCheckoutCreated]
   );
+  const salesOpsHealth = useMemo(() => {
+    if (salesOpsFocusCount === 0) return { label: 'Sin muestra', tone: 'bg-slate-100 text-slate-700' };
+    if (salesOpsFocusToCheckoutRate >= 35) return { label: 'Verde', tone: 'bg-emerald-100 text-emerald-800' };
+    if (salesOpsFocusToCheckoutRate >= 18) return { label: 'Amarillo', tone: 'bg-amber-100 text-amber-800' };
+    return { label: 'Rojo', tone: 'bg-rose-100 text-rose-800' };
+  }, [salesOpsFocusCount, salesOpsFocusToCheckoutRate]);
   const recommendedCtaKpis = useMemo(
     () =>
       RECOMMENDED_CTA_FLOWS.map((flow) => {
@@ -916,6 +922,12 @@ export default function AdminBillingPage() {
             </p>
             <p className="mt-1 text-xs text-slate-500">
               Focus→Pitch: {salesOpsFocusToPitchRate.toFixed(2)}% · Focus→Checkout: {salesOpsFocusToCheckoutRate.toFixed(2)}%
+            </p>
+            <p className="mt-2 text-xs">
+              Estado:
+              <span className={`ml-2 rounded px-2 py-1 font-semibold ${salesOpsHealth.tone}`}>
+                {salesOpsHealth.label}
+              </span>
             </p>
             {salesOpsContextKpi.lowSample && (
               <p className="mt-2 rounded bg-amber-50 px-2 py-1 text-xs text-amber-800">
