@@ -16,6 +16,28 @@ function statusBadgeClass(status) {
   return 'bg-slate-100 text-slate-700';
 }
 
+function getUsageItems(limits, usage) {
+  const mapping = [
+    { limitKey: 'max_members', usageKey: 'active_members', label: 'Socios activos' },
+    { limitKey: 'max_staff_users', usageKey: 'active_staff_users', label: 'Usuarios staff' },
+    { limitKey: 'max_gyms', usageKey: 'active_gyms', label: 'Sedes activas' },
+    { limitKey: 'max_monthly_payments', usageKey: 'monthly_payments', label: 'Pagos mensuales' },
+    { limitKey: 'max_monthly_checkins', usageKey: 'monthly_checkins', label: 'Check-ins mensuales' },
+    { limitKey: 'max_monthly_pos_sales', usageKey: 'monthly_pos_sales', label: 'Ventas POS mensuales' },
+    { limitKey: 'max_monthly_whatsapp_messages', usageKey: 'monthly_whatsapp_messages', label: 'Mensajes WhatsApp mensuales' },
+    { limitKey: 'max_monthly_reports_queries', usageKey: 'monthly_reports_queries', label: 'Consultas de reportes mensuales' }
+  ];
+
+  return mapping
+    .filter((item) => Number(limits?.[item.limitKey] ?? 0) > 0)
+    .map((item) => {
+      const limit = Number(limits?.[item.limitKey] ?? 0);
+      const current = Number(usage?.[item.usageKey] ?? 0);
+      const percent = limit > 0 ? Math.min(100, Math.round((current / limit) * 100)) : 0;
+      return { ...item, current, limit, percent };
+    });
+}
+
 export default function SelfServiceUpgradePage() {
   const user = useAuthStore((state) => state.user);
   const tenantId = String(user?.tenant_id ?? localStorage.getItem('tenant_id') ?? '');
@@ -28,6 +50,12 @@ export default function SelfServiceUpgradePage() {
   const [billingAction, setBillingAction] = useState('');
 
   const usage = useMemo(() => subscription?.usage ?? {}, [subscription]);
+  const limits = useMemo(() => subscription?.limits ?? {}, [subscription]);
+  const usageItems = useMemo(() => getUsageItems(limits, usage), [limits, usage]);
+  const highestUsagePercent = useMemo(
+    () => usageItems.reduce((acc, item) => (item.percent > acc ? item.percent : acc), 0),
+    [usageItems]
+  );
 
   const loadData = async () => {
     if (!tenantId) return;
@@ -125,16 +153,32 @@ export default function SelfServiceUpgradePage() {
 
           <div className="rounded-lg border border-slate-200 p-3">
             <h3 className="mb-2 text-sm font-semibold text-slate-700">Uso actual</h3>
-            <ul className="space-y-1 text-sm text-slate-600">
-              {Object.entries(usage).length === 0 && <li>Sin datos de uso.</li>}
-              {Object.entries(usage).map(([key, value]) => (
-                <li key={key} className="flex justify-between gap-2">
-                  <span>{key}</span>
-                  <span className="font-medium text-slate-900">{String(value)}</span>
-                </li>
+            <div className="space-y-2">
+              {usageItems.length === 0 && <p className="text-sm text-slate-500">Sin límites configurados para este plan.</p>}
+              {usageItems.map((item) => (
+                <div key={item.limitKey} className="space-y-1">
+                  <div className="flex items-center justify-between text-xs text-slate-600">
+                    <span>{item.label}</span>
+                    <span className="font-semibold text-slate-900">{item.current}/{item.limit} ({item.percent}%)</span>
+                  </div>
+                  <div className="h-2 rounded-full bg-slate-100">
+                    <div
+                      className={`h-2 rounded-full ${item.percent >= 90 ? 'bg-red-500' : item.percent >= 75 ? 'bg-amber-500' : 'bg-emerald-500'}`}
+                      style={{ width: `${item.percent}%` }}
+                    />
+                  </div>
+                </div>
               ))}
-            </ul>
+            </div>
           </div>
+
+          {highestUsagePercent >= 75 && String(subscription.plan_code ?? '').toLowerCase() !== 'scale' && (
+            <div className="rounded-lg border border-amber-300 bg-amber-50 p-3">
+              <p className="text-sm font-semibold text-amber-800">
+                Estás usando {highestUsagePercent}% de tu plan. Recomendado: upgrade preventivo.
+              </p>
+            </div>
+          )}
 
           {String(subscription.plan_code ?? '').toLowerCase() !== 'pro' && (
             <button

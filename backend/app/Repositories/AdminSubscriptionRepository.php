@@ -102,6 +102,47 @@ final class AdminSubscriptionRepository
         return (int) $stmt->fetchColumn();
     }
 
+    public function countMonthlyPosSales(int $tenantId): int
+    {
+        $stmt = Database::connection()->prepare(
+            'SELECT COUNT(*)
+             FROM pos_sales
+             WHERE tenant_id = :tenant_id
+               AND deleted_at IS NULL
+               AND YEAR(created_at) = YEAR(CURRENT_DATE())
+               AND MONTH(created_at) = MONTH(CURRENT_DATE())'
+        );
+        $stmt->execute(['tenant_id' => $tenantId]);
+        return (int) $stmt->fetchColumn();
+    }
+
+    public function countMonthlyWhatsAppMessages(int $tenantId): int
+    {
+        $stmt = Database::connection()->prepare(
+            'SELECT COUNT(*)
+             FROM whatsapp_batch_items
+             WHERE tenant_id = :tenant_id
+               AND YEAR(created_at) = YEAR(CURRENT_DATE())
+               AND MONTH(created_at) = MONTH(CURRENT_DATE())'
+        );
+        $stmt->execute(['tenant_id' => $tenantId]);
+        return (int) $stmt->fetchColumn();
+    }
+
+    public function countMonthlyReportsQueries(int $tenantId): int
+    {
+        $stmt = Database::connection()->prepare(
+            'SELECT COUNT(*)
+             FROM activity_logs
+             WHERE tenant_id = :tenant_id
+               AND action = "reports_renewals_query"
+               AND YEAR(created_at) = YEAR(CURRENT_DATE())
+               AND MONTH(created_at) = MONTH(CURRENT_DATE())'
+        );
+        $stmt->execute(['tenant_id' => $tenantId]);
+        return (int) $stmt->fetchColumn();
+    }
+
     public function deactivateActiveSubscriptions(int $tenantId, string $endedAt): void
     {
         $stmt = Database::connection()->prepare(

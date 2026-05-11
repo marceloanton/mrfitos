@@ -23,6 +23,9 @@ final class AdminSubscriptionService
 
         return [
             'tenant_id' => $tenantId,
+            'plan_code' => (string) ($active['plan_code'] ?? ''),
+            'plan_name' => (string) ($active['plan_name'] ?? ''),
+            'status' => (string) ($active['status'] ?? 'active'),
             'plan' => [
                 'code' => (string) ($active['plan_code'] ?? ''),
                 'name' => (string) ($active['plan_name'] ?? '')
@@ -34,7 +37,10 @@ final class AdminSubscriptionService
                 'active_gyms' => $this->repo->countActiveGyms($tenantId),
                 'active_staff_users' => $this->repo->countActiveStaffUsers($tenantId),
                 'monthly_payments' => $this->repo->countMonthlyPayments($tenantId),
-                'monthly_checkins' => $this->repo->countMonthlyAttendanceCheckins($tenantId)
+                'monthly_checkins' => $this->repo->countMonthlyAttendanceCheckins($tenantId),
+                'monthly_pos_sales' => $this->repo->countMonthlyPosSales($tenantId),
+                'monthly_whatsapp_messages' => $this->repo->countMonthlyWhatsAppMessages($tenantId),
+                'monthly_reports_queries' => $this->repo->countMonthlyReportsQueries($tenantId)
             ]
         ];
     }
