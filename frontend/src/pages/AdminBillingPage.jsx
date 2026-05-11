@@ -70,6 +70,7 @@ const RECOMMENDED_CTA_FLOWS = [
   { key: 'plan_scale', label: 'Plan Scale' },
   { key: 'addon_whatsapp', label: 'Add-on WhatsApp' }
 ];
+const OPPORTUNITY_PREFS_KEY = 'admin-billing-opportunity-prefs-v1';
 
 function normalizeTrackingSummary(payload) {
   const totals = payload?.event_totals ?? payload?.totals ?? payload?.events ?? {};
@@ -412,6 +413,34 @@ export default function AdminBillingPage() {
     setFilters(next);
     await Promise.all([loadData(next), loadTrackingSummary(next), loadGlobalComposite(next)]);
   };
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(OPPORTUNITY_PREFS_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        const threshold = Number(parsed?.opportunityThreshold ?? 60);
+        if (Number.isFinite(threshold) && threshold >= 40 && threshold <= 90) {
+          setOpportunityThreshold(threshold);
+        }
+        setShowOnlyHighOpportunity(Boolean(parsed?.showOnlyHighOpportunity));
+      }
+    } catch {
+      // ignore invalid persisted prefs
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        OPPORTUNITY_PREFS_KEY,
+        JSON.stringify({ opportunityThreshold, showOnlyHighOpportunity })
+      );
+    } catch {
+      // non-blocking persistence
+    }
+  }, [opportunityThreshold, showOnlyHighOpportunity]);
 
   useEffect(() => {
     loadData(filters);
