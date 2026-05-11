@@ -16,14 +16,22 @@ export default function AppLayout() {
   const availableGyms = Array.isArray(user?.available_gyms) ? user.available_gyms : [];
   const [riskBanner, setRiskBanner] = useState(null);
   const [receptionNavMode, setReceptionNavMode] = useState(true);
-  const receptionNavStorageKey = user
+  const receptionLegacyLayoutStorageKey = user
     ? `layout-reception-nav-v1:${user.id || user.email || 'user'}:${user.gym_id || 'gym'}`
+    : null;
+  const receptionLegacyPosStorageKey = user
+    ? `pos-reception-mode-v1:${user.id || user.email || 'user'}:${user.gym_id || 'gym'}`
+    : null;
+  const receptionNavStorageKey = user
+    ? `reception-mode-v1:${user.id || user.email || 'user'}:${user.gym_id || 'gym'}`
     : null;
 
   useEffect(() => {
     if (!receptionNavStorageKey) return;
     try {
-      const raw = localStorage.getItem(receptionNavStorageKey);
+      const raw = localStorage.getItem(receptionNavStorageKey)
+        ?? localStorage.getItem(receptionLegacyLayoutStorageKey)
+        ?? localStorage.getItem(receptionLegacyPosStorageKey);
       if (!raw) return;
       const parsed = JSON.parse(raw);
       if (typeof parsed?.enabled === 'boolean') {
@@ -32,7 +40,7 @@ export default function AppLayout() {
     } catch {
       // ignore corrupted localStorage
     }
-  }, [receptionNavStorageKey]);
+  }, [receptionNavStorageKey, receptionLegacyLayoutStorageKey, receptionLegacyPosStorageKey]);
 
   useEffect(() => {
     if (!receptionNavStorageKey) return;

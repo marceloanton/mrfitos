@@ -156,8 +156,14 @@ export default function PosPage() {
   const collectorPrefsStorageKey = user
     ? `pos-collector-ranking-prefs-v1:${user.id || user.email || 'user'}:${user.gym_id || 'gym'}`
     : null;
-  const receptionModeStorageKey = user
+  const receptionLegacyPosStorageKey = user
     ? `pos-reception-mode-v1:${user.id || user.email || 'user'}:${user.gym_id || 'gym'}`
+    : null;
+  const receptionLegacyLayoutStorageKey = user
+    ? `layout-reception-nav-v1:${user.id || user.email || 'user'}:${user.gym_id || 'gym'}`
+    : null;
+  const receptionModeStorageKey = user
+    ? `reception-mode-v1:${user.id || user.email || 'user'}:${user.gym_id || 'gym'}`
     : null;
   const toFriendlyApiError = (err, fallbackMessage) => {
     const apiMessage = err?.response?.data?.message;
@@ -365,7 +371,9 @@ export default function PosPage() {
   useEffect(() => {
     if (!receptionModeStorageKey) return;
     try {
-      const raw = localStorage.getItem(receptionModeStorageKey);
+      const raw = localStorage.getItem(receptionModeStorageKey)
+        ?? localStorage.getItem(receptionLegacyPosStorageKey)
+        ?? localStorage.getItem(receptionLegacyLayoutStorageKey);
       if (!raw) return;
       const parsed = JSON.parse(raw);
       if (typeof parsed?.enabled === 'boolean') {
@@ -374,7 +382,7 @@ export default function PosPage() {
     } catch {
       // ignore corrupted localStorage
     }
-  }, [receptionModeStorageKey]);
+  }, [receptionModeStorageKey, receptionLegacyPosStorageKey, receptionLegacyLayoutStorageKey]);
 
   useEffect(() => {
     if (!receptionModeStorageKey) return;
