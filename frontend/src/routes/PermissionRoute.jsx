@@ -1,5 +1,6 @@
 import { Navigate, Outlet } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
+import { resolveDefaultHomePath } from '../utils/roleProfile';
 
 export default function PermissionRoute({ permission, permissions = [], capability, capabilities = [] }) {
   const hasPermission = useAuthStore((state) => state.hasPermission);
@@ -14,7 +15,7 @@ export default function PermissionRoute({ permission, permissions = [], capabili
     (typeof permission === 'string' && permission.length > 0 && hasPermission(permission)) ||
     (Array.isArray(permissions) && permissions.some((p) => hasPermission(p)));
   if (!allowed) {
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to={resolveDefaultHomePath(user)} replace />;
   }
   return <Outlet />;
 }

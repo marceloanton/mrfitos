@@ -1,6 +1,8 @@
 import { Suspense, lazy } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import AppLayout from '../layouts/AppLayout';
+import { useAuthStore } from '../stores/authStore';
+import { resolveDefaultHomePath } from '../utils/roleProfile';
 import PermissionRoute from './PermissionRoute';
 import ProtectedRoute from './ProtectedRoute';
 
@@ -33,6 +35,12 @@ function RouteLoader() {
   );
 }
 
+function ProfileHomeRedirect() {
+  const user = useAuthStore((state) => state.user);
+  const fallback = resolveDefaultHomePath(user);
+  return <Navigate to={fallback} replace />;
+}
+
 export default function AppRoutes() {
   return (
     <Suspense fallback={<RouteLoader />}>
@@ -44,6 +52,7 @@ export default function AppRoutes() {
         <Route path="/login" element={<LoginPage />} />
         <Route element={<ProtectedRoute />}>
           <Route element={<AppLayout />}>
+            <Route path="/" element={<ProfileHomeRedirect />} />
             <Route element={<PermissionRoute permission="dashboard.read" />}>
               <Route path="/dashboard" element={<DashboardPage />} />
             </Route>
@@ -87,7 +96,7 @@ export default function AppRoutes() {
             <Route path="/billing/self-service" element={<SelfServiceUpgradePage />} />
           </Route>
         </Route>
-        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+        <Route path="*" element={<ProfileHomeRedirect />} />
       </Routes>
     </Suspense>
   );

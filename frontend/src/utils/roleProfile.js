@@ -32,3 +32,13 @@ export function resolveManagementFlag(user = null) {
   }
   return isManagementProfile(user?.permissions ?? []);
 }
+
+export function resolveDefaultHomePath(user = null) {
+  const capabilities = user?.capabilities ?? {};
+  if (capabilities?.management === true) return '/dashboard';
+  if (capabilities?.pos === true) return '/pos';
+
+  const role = resolveHudRole(user);
+  if (role.code === 'manager') return '/dashboard';
+  return '/pos';
+}
