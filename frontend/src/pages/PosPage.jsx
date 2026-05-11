@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { adjustStock, autoSettleMemberAccountCharges, bulkMarkPromiseAgendaContacted, closeCashSession, createPosAlertContact, createPosProduct, createPosSale, deletePosAlertContact, exportMemberAccountCollectorRankingCsv, exportMemberAccountContactEffectivenessCsv, exportMemberAccountPromiseAgendaCsv, exportOverduePromiseWhatsAppLinksCsv, exportPosAlertDispatchHistoryCsv, exportPosAuditCsv, exportPosAutosettleKpiCsv, exportPosZCloseCsv, getCashByOperatorReport, getCashSessionReport, getMemberAccountAging, getMemberAccountCollectorRanking, getMemberAccountCollectionsKpiToday, getMemberAccountContactEffectiveness, getMemberAccountFollowupFunnel, getMemberAccountOverdueWhatsAppLink, getMemberAccountPromiseAgenda, getOpenCashSessionSummary, getOverduePromiseWhatsAppLinks, getPosAlertNotifyLink, getPosAlerts, getPosAlertsStatus, getPosAutosettleKpi, getPosConfig, getPosSaleReceipt, getPosSaleReceiptByNumber, getPosSummary, getPosZCloseReport, listCashSessions, listLowStockProducts, listMemberAccountCharges, listPosAlertContacts, listPosAlertDispatchHistory, listPosAlertsCronHistory, listPosAudit, listPosProducts, listPosSales, listStockMovements, notifyCriticalPosAlert, openCashSession, settleMemberAccountCharge, updateMemberAccountFollowupContactResult, updatePosAlertContact, updatePosConfig, upsertMemberAccountFollowup, voidPosSale } from '../services/posService';
 import { useAuthStore } from '../stores/authStore';
+import PosCashPanel from '../components/pos/PosCashPanel';
+import PosSalesPanel from '../components/pos/PosSalesPanel';
 
 export default function PosPage() {
   const location = useLocation();
@@ -1711,43 +1713,16 @@ ${sale.notes ? `Nota: ${sale.notes}` : ''}
         </div>
       </div>
 
-      <div id="pos-ventas" className="rounded-xl bg-white p-4 shadow-sm">
-        <h3 className="mb-2 text-lg font-semibold text-slate-900">Últimas ventas POS</h3>
-        <div className="mb-3 flex flex-wrap items-center gap-2">
-          <input
-            className="rounded border border-slate-300 p-2 text-sm"
-            placeholder="N° comprobante (ej: POS-001-00000025)"
-            value={receiptNumber}
-            onChange={(e) => setReceiptNumber(e.target.value)}
-          />
-          <button className="rounded border border-slate-300 px-2 py-1 text-sm" onClick={() => onReprintByReceiptNumber('58')}>
-            Reimprimir 58mm
-          </button>
-          <button className="rounded border border-slate-300 px-2 py-1 text-sm" onClick={() => onReprintByReceiptNumber('80')}>
-            Reimprimir 80mm
-          </button>
-        </div>
-        <div className="space-y-2">
-          {sales.length === 0 ? (
-            <p className="text-sm text-slate-500">Sin ventas.</p>
-          ) : sales.map((s) => (
-            <div key={s.id} className="flex items-center justify-between gap-2 rounded border border-slate-200 p-2 text-sm">
-              <span>{s.receipt_number ?? `#${s.id}`} · {s.total_amount} {s.currency} · {s.charge_mode} · {s.member_code ? `${s.member_code} ${s.first_name} ${s.last_name}` : 'sin socio'}</span>
-              <div className="flex gap-1">
-                <button className="rounded border border-slate-300 px-2 py-1 disabled:opacity-50" disabled={!canReportRead} onClick={() => onPrintSaleTicket(s.id, '58')}>
-                  Ticket 58mm
-                </button>
-                <button className="rounded border border-slate-300 px-2 py-1 disabled:opacity-50" disabled={!canReportRead} onClick={() => onPrintSaleTicket(s.id, '80')}>
-                  Ticket 80mm
-                </button>
-                <button className="rounded border border-red-300 px-2 py-1 text-red-700 disabled:opacity-50" disabled={!canVoid} onClick={() => onVoidSale(s)}>
-                  Anular
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
+      <PosSalesPanel
+        receiptNumber={receiptNumber}
+        setReceiptNumber={setReceiptNumber}
+        onReprintByReceiptNumber={onReprintByReceiptNumber}
+        sales={sales}
+        canReportRead={canReportRead}
+        canVoid={canVoid}
+        onPrintSaleTicket={onPrintSaleTicket}
+        onVoidSale={onVoidSale}
+      />
 
       <div className="rounded-xl bg-white p-4 shadow-sm">
         <h3 className="mb-2 text-lg font-semibold text-slate-900">Movimientos de stock</h3>
@@ -1762,52 +1737,14 @@ ${sale.notes ? `Nota: ${sale.notes}` : ''}
         </div>
       </div>
 
-      <div id="pos-caja" className="rounded-xl bg-white p-4 shadow-sm">
-        <h3 className="mb-2 text-lg font-semibold text-slate-900">Últimos cierres de caja</h3>
-        <div className="mb-3 flex items-center gap-2">
-          <input
-            className="w-32 rounded border border-slate-300 p-2 text-sm"
-            placeholder="user_id"
-            value={cashOperatorUserId}
-            onChange={(e) => setCashOperatorUserId(e.target.value)}
-          />
-          <button className="rounded border border-slate-300 px-2 py-1 text-sm" onClick={load}>
-            Filtrar operador
-          </button>
-        </div>
-        <div className="space-y-2">
-          {cashSessions.length === 0 ? (
-            <p className="text-sm text-slate-500">Sin sesiones de caja.</p>
-          ) : cashSessions.map((c) => (
-            <div key={c.id} className="flex items-center justify-between gap-2 rounded border border-slate-200 p-2 text-sm">
-              <span>#{c.id} · {c.status} · apertura {c.opening_amount} · esperado {c.expected_amount ?? '-'} · cierre {c.closing_amount ?? '-'} · diferencia {c.difference_amount ?? '-'}</span>
-              <button className="rounded border border-slate-300 px-2 py-1" onClick={() => onPrintCashReport(c.id)}>
-                Imprimir cierre
-              </button>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div className="rounded-xl bg-white p-4 shadow-sm">
-        <h3 className="mb-2 text-lg font-semibold text-slate-900">Resumen caja por operador</h3>
-        {cashByOperator?.summary ? (
-          <div className="mb-3 text-sm text-slate-700">
-            Sesiones: {cashByOperator.summary.sessions_count ?? 0} · Apertura: {cashByOperator.summary.opening_total ?? 0} · Esperado: {cashByOperator.summary.expected_total ?? 0} · Cierre: {cashByOperator.summary.closing_total ?? 0} · Diferencia: {cashByOperator.summary.difference_total ?? 0}
-          </div>
-        ) : (
-          <p className="mb-3 text-sm text-slate-500">Sin resumen.</p>
-        )}
-        <div className="space-y-2">
-          {Array.isArray(cashByOperator?.operators) && cashByOperator.operators.length > 0 ? cashByOperator.operators.map((r) => (
-            <div key={String(r.user_id)} className="rounded border border-slate-200 p-2 text-sm">
-              Usuario {r.user_id} · sesiones {r.sessions_count} · apertura {r.opening_total} · esperado {r.expected_total} · cierre {r.closing_total} · diferencia {r.difference_total}
-            </div>
-          )) : (
-            <p className="text-sm text-slate-500">Sin datos por operador.</p>
-          )}
-        </div>
-      </div>
+      <PosCashPanel
+        load={load}
+        cashOperatorUserId={cashOperatorUserId}
+        setCashOperatorUserId={setCashOperatorUserId}
+        cashSessions={cashSessions}
+        onPrintCashReport={onPrintCashReport}
+        cashByOperator={cashByOperator}
+      />
 
       {showRiskHub && (
       <>
