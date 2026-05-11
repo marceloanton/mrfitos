@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { NavLink, useLocation } from 'react-router-dom';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { adjustStock, autoSettleMemberAccountCharges, bulkMarkPromiseAgendaContacted, closeCashSession, createPosAlertContact, createPosProduct, createPosSale, deletePosAlertContact, exportMemberAccountCollectorRankingCsv, exportMemberAccountContactEffectivenessCsv, exportMemberAccountPromiseAgendaCsv, exportOverduePromiseWhatsAppLinksCsv, exportPosAlertDispatchHistoryCsv, exportPosAuditCsv, exportPosAutosettleKpiCsv, exportPosZCloseCsv, getCashByOperatorReport, getCashSessionReport, getMemberAccountAging, getMemberAccountCollectorRanking, getMemberAccountCollectionsKpiToday, getMemberAccountContactEffectiveness, getMemberAccountFollowupFunnel, getMemberAccountOverdueWhatsAppLink, getMemberAccountPromiseAgenda, getOpenCashSessionSummary, getOverduePromiseWhatsAppLinks, getPosAlertNotifyLink, getPosAlerts, getPosAlertsStatus, getPosAutosettleKpi, getPosConfig, getPosSaleReceipt, getPosSaleReceiptByNumber, getPosSummary, getPosZCloseReport, listCashSessions, listLowStockProducts, listMemberAccountCharges, listPosAlertContacts, listPosAlertDispatchHistory, listPosAlertsCronHistory, listPosAudit, listPosProducts, listPosSales, listStockMovements, notifyCriticalPosAlert, openCashSession, settleMemberAccountCharge, updateMemberAccountFollowupContactResult, updatePosAlertContact, updatePosConfig, upsertMemberAccountFollowup, voidPosSale } from '../services/posService';
 import { useAuthStore } from '../stores/authStore';
 import PosCashPanel from '../components/pos/PosCashPanel';
@@ -9,6 +9,7 @@ import PosSalesPanel from '../components/pos/PosSalesPanel';
 
 export default function PosPage() {
   const location = useLocation();
+  const navigate = useNavigate();
   const hasPermission = useAuthStore((s) => s.hasPermission);
   const user = useAuthStore((s) => s.user);
   const canSaleCreate = hasPermission('pos.sale.create') || hasPermission('payments.write');
@@ -394,6 +395,34 @@ export default function PosPage() {
     setShowCollectionsHub(false);
     setShowRiskHub(false);
   }, [location.pathname]);
+
+  useEffect(() => {
+    const onKeyDown = (event) => {
+      const targetTag = event.target?.tagName?.toLowerCase();
+      const isTypingContext = targetTag === 'input' || targetTag === 'textarea' || targetTag === 'select' || event.target?.isContentEditable;
+      if (isTypingContext) return;
+
+      if (event.key === 'F2') {
+        event.preventDefault();
+        navigate('/pos/caja');
+      }
+      if (event.key === 'F3') {
+        event.preventDefault();
+        navigate('/pos/ventas');
+      }
+      if (event.key === 'F4') {
+        event.preventDefault();
+        navigate('/pos/productos');
+      }
+      if (event.key === 'F8') {
+        event.preventDefault();
+        navigate('/pos/control');
+      }
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [navigate]);
 
   useEffect(() => {
     if (!collectorPrefsStorageKey) return;
@@ -1146,6 +1175,9 @@ ${sale.notes ? `Nota: ${sale.notes}` : ''}
             </NavLink>
           ))}
         </div>
+        <p className="mt-3 text-xs text-slate-500">
+          Atajos: F2 Caja · F3 Ventas · F4 Productos · F8 Control
+        </p>
         <div className="mt-3 flex flex-wrap gap-2">
           <button
             className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
