@@ -371,6 +371,12 @@ export default function AdminBillingPage() {
 
   const onExportDailyPriorityCsv = () => {
     if (dailyPriorityRows.length === 0) return;
+    trackEvent('sales_priority_export_csv', 'admin_billing', {
+      rows: dailyPriorityRows.length,
+      offer_filter: offerFilter,
+      date_from: filters.from || null,
+      date_to: filters.to || null
+    });
     const headers = [
       'tenant_id',
       'tenant_name',
