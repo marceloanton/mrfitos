@@ -52,6 +52,20 @@ export default function AppLayout() {
   }, [receptionNavStorageKey, receptionNavMode]);
 
   useEffect(() => {
+    const onKeyDown = (event) => {
+      const targetTag = event.target?.tagName?.toLowerCase();
+      const isTypingContext = targetTag === 'input' || targetTag === 'textarea' || targetTag === 'select' || event.target?.isContentEditable;
+      if (isTypingContext) return;
+      if (event.altKey && (event.key === 'r' || event.key === 'R')) {
+        event.preventDefault();
+        setReceptionNavMode((v) => !v);
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, []);
+
+  useEffect(() => {
     let alive = true;
     const loadRisk = async () => {
       if (!token || !hasPermission('dashboard.read')) return;
@@ -100,14 +114,6 @@ export default function AppLayout() {
             {!receptionNavMode && hasPermission('subscriptions.manage') && <NavLink to="/admin/billing" className="rounded px-3 py-2 text-sm hover:bg-slate-100">Admin Billing</NavLink>}
             {!receptionNavMode && hasPermission('subscriptions.manage.catalog') && <NavLink to="/admin/modules" className="rounded px-3 py-2 text-sm hover:bg-slate-100">Admin Módulos</NavLink>}
             {!receptionNavMode && <NavLink to="/billing/self-service" className="rounded px-3 py-2 text-sm hover:bg-slate-100">Mi Plan</NavLink>}
-            <button
-              className={`rounded px-3 py-2 text-xs font-semibold ${
-                receptionNavMode ? 'bg-emerald-600 text-white' : 'border border-slate-300 text-slate-700'
-              }`}
-              onClick={() => setReceptionNavMode((v) => !v)}
-            >
-              {receptionNavMode ? 'Modo Recepción ON' : 'Modo Recepción OFF'}
-            </button>
             {availableGyms.length > 1 && (
               <select
                 className="rounded border border-slate-300 px-2 py-2 text-sm"
@@ -123,6 +129,15 @@ export default function AppLayout() {
                 ))}
               </select>
             )}
+            <button
+              className={`rounded px-3 py-2 text-xs font-semibold ${
+                receptionNavMode ? 'bg-emerald-600 text-white' : 'border border-slate-300 text-slate-700'
+              }`}
+              title="Atajo Alt+R"
+              onClick={() => setReceptionNavMode((v) => !v)}
+            >
+              {receptionNavMode ? 'Modo Recepción ON' : 'Modo Recepción OFF'} · Alt+R
+            </button>
             <button
               className="rounded border border-slate-300 px-3 py-2 text-sm"
               onClick={() => {
