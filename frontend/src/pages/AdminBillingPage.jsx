@@ -10,6 +10,7 @@ import {
   getTenantConversionRanking
 } from '../services/adminBillingService';
 import { getAdminTrackingSummary } from '../services/adminTrackingService';
+import { trackEvent } from '../services/trackingService';
 
 function statusBadgeClass(status) {
   const normalized = String(status || '').toLowerCase();
@@ -62,7 +63,9 @@ const TRACKING_EVENTS = [
   { key: 'upgrade_banner_click', label: 'Banner click' },
   { key: 'upgrade_badge_click', label: 'Badge click' },
   { key: 'upgrade_pay_now_click', label: 'Pay now click' },
-  { key: 'upgrade_recommended_cta_click', label: 'Recommended CTA click' }
+  { key: 'upgrade_recommended_cta_click', label: 'Recommended CTA click' },
+  { key: 'sales_pitch_copy_tenant', label: 'Pitch copy tenant' },
+  { key: 'sales_pitch_copy_segment', label: 'Pitch copy segment' }
 ];
 const MIN_SAMPLE_CHECKOUTS = 10;
 const RECOMMENDED_CTA_FLOWS = [
@@ -88,7 +91,9 @@ function normalizeTrackingSummary(payload) {
       upgrade_banner_click: toInt(totals?.upgrade_banner_click ?? 0),
       upgrade_badge_click: toInt(totals?.upgrade_badge_click ?? 0),
       upgrade_pay_now_click: toInt(totals?.upgrade_pay_now_click ?? 0),
-      upgrade_recommended_cta_click: toInt(totals?.upgrade_recommended_cta_click ?? 0)
+      upgrade_recommended_cta_click: toInt(totals?.upgrade_recommended_cta_click ?? 0),
+      sales_pitch_copy_tenant: toInt(totals?.sales_pitch_copy_tenant ?? 0),
+      sales_pitch_copy_segment: toInt(totals?.sales_pitch_copy_segment ?? 0)
     },
     daily,
     byContext: payload?.by_context ?? {},
@@ -101,7 +106,9 @@ function buildCompositeKpi(funnelData, trackingData) {
     toInt(trackingData?.totals?.upgrade_banner_click) +
     toInt(trackingData?.totals?.upgrade_badge_click) +
     toInt(trackingData?.totals?.upgrade_pay_now_click) +
-    toInt(trackingData?.totals?.upgrade_recommended_cta_click);
+    toInt(trackingData?.totals?.upgrade_recommended_cta_click) +
+    toInt(trackingData?.totals?.sales_pitch_copy_tenant) +
+    toInt(trackingData?.totals?.sales_pitch_copy_segment);
   const checkoutSessions = toInt(funnelData?.total_sessions);
   const approved = toInt(funnelData?.approved_sessions);
   const ctrUpgrade = checkoutSessions > 0 ? (clicks / checkoutSessions) * 100 : 0;
@@ -119,7 +126,9 @@ function buildContextKpi(contextTotals = {}) {
     toInt(contextTotals?.upgrade_banner_click) +
     toInt(contextTotals?.upgrade_badge_click) +
     toInt(contextTotals?.upgrade_pay_now_click) +
-    toInt(contextTotals?.upgrade_recommended_cta_click);
+    toInt(contextTotals?.upgrade_recommended_cta_click) +
+    toInt(contextTotals?.sales_pitch_copy_tenant) +
+    toInt(contextTotals?.sales_pitch_copy_segment);
   const checkoutSessions = toInt(contextTotals?.checkout_created);
   const approved = toInt(contextTotals?.approved);
   const ctrUpgrade = checkoutSessions > 0 ? (clicks / checkoutSessions) * 100 : 0;
@@ -343,6 +352,12 @@ export default function AdminBillingPage() {
       ...lines
     ].join('\n');
     setCampaignMessage(message);
+    trackEvent('sales_pitch_copy_segment', 'admin_billing', {
+      offer_filter: offerFilter,
+      rows: topRows.length,
+      date_from: filters.from || null,
+      date_to: filters.to || null
+    });
     try {
       await navigator.clipboard.writeText(message);
     } catch {
@@ -1042,6 +1057,11 @@ export default function AdminBillingPage() {
                           className="rounded border border-fuchsia-300 px-2 py-1 text-xs text-fuchsia-700"
                           onClick={async () => {
                             const pitch = buildOfferPitch(row, recommendation);
+                            trackEvent('sales_pitch_copy_tenant', 'admin_billing', {
+                              tenant_id: row.tenant_id,
+                              offer_code: recommendation.code,
+                              offer_label: recommendation.label
+                            });
                             try {
                               await navigator.clipboard.writeText(pitch);
                             } catch {
