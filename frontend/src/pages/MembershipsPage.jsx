@@ -11,6 +11,29 @@ const emptyForm = {
   auto_renew: 0
 };
 
+const statusClass = (membershipStatus) => {
+  switch (membershipStatus) {
+    case 'active':
+      return 'bg-emerald-100 text-emerald-700';
+    case 'expired':
+      return 'bg-slate-200 text-slate-700';
+    case 'cancelled':
+      return 'bg-rose-100 text-rose-700';
+    case 'paused':
+      return 'bg-amber-100 text-amber-700';
+    default:
+      return 'bg-slate-100 text-slate-700';
+  }
+};
+
+const statusLabel = (membershipStatus) => {
+  if (membershipStatus === 'active') return 'Activa';
+  if (membershipStatus === 'expired') return 'Vencida';
+  if (membershipStatus === 'cancelled') return 'Cancelada';
+  if (membershipStatus === 'paused') return 'Pausada';
+  return membershipStatus;
+};
+
 export default function MembershipsPage() {
   const hasPermission = useAuthStore((s) => s.hasPermission);
   const canWrite = hasPermission('memberships.write');
@@ -57,25 +80,51 @@ export default function MembershipsPage() {
 
   return (
     <section className="space-y-4">
-      <div className="flex items-center justify-between rounded-xl bg-white p-4 shadow-sm">
-        <h2 className="text-2xl font-semibold">Membresías</h2>
-        {canWrite && <button className="rounded bg-brand-600 px-4 py-2 text-white" onClick={() => { setForm(emptyForm); setEditing(null); setOpen(true); }}>Nueva membresía</button>}
+      <div className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-gradient-to-r from-cyan-50 via-sky-50 to-white p-5 shadow-sm md:flex-row md:items-center md:justify-between">
+        <div>
+          <h2 className="text-2xl font-semibold text-slate-900">Membresías</h2>
+          <p className="text-sm text-slate-600">Control de vigencia, renovación y estado comercial</p>
+          <p className="mt-1 text-xs font-medium uppercase tracking-wide text-slate-500">
+            Total registros: {meta.total}
+          </p>
+        </div>
+        {canWrite && (
+          <button
+            className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-700"
+            onClick={() => {
+              setForm(emptyForm);
+              setEditing(null);
+              setOpen(true);
+            }}
+          >
+            Nueva membresía
+          </button>
+        )}
       </div>
 
-      <div className="grid gap-3 rounded-xl bg-white p-4 shadow-sm md:grid-cols-3">
-        <select className="rounded border p-2" value={status} onChange={(e) => setStatus(e.target.value)}>
+      <div className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:grid-cols-3">
+        <select
+          className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+          value={status}
+          onChange={(e) => setStatus(e.target.value)}
+        >
           <option value="">Todos</option>
           <option value="active">Activa</option>
           <option value="expired">Vencida</option>
           <option value="cancelled">Cancelada</option>
           <option value="paused">Pausada</option>
         </select>
-        <button className="rounded border p-2" onClick={() => load(1)}>Filtrar</button>
+        <button
+          className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium transition hover:bg-slate-50"
+          onClick={() => load(1)}
+        >
+          Filtrar
+        </button>
       </div>
 
       {error && <p className="rounded bg-red-50 p-3 text-sm text-red-700">{error}</p>}
 
-      <div className="overflow-x-auto rounded-xl bg-white shadow-sm">
+      <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
         <table className="min-w-full text-sm">
           <thead className="bg-slate-50 text-left text-slate-600">
             <tr>
@@ -84,13 +133,53 @@ export default function MembershipsPage() {
           </thead>
           <tbody>
             {loading ? <tr><td className="p-4" colSpan={6}>Cargando...</td></tr> : items.length === 0 ? <tr><td className="p-4" colSpan={6}>Sin resultados</td></tr> : items.map((m) => (
-              <tr key={m.id} className="border-t">
-                <td className="p-3">{m.member_code} - {m.first_name} {m.last_name}</td>
-                <td className="p-3">{m.plan_name}</td>
+              <tr key={m.id} className="border-t border-slate-100">
+                <td className="p-3 font-medium text-slate-900">{m.member_code} - {m.first_name} {m.last_name}</td>
+                <td className="p-3 text-slate-700">{m.plan_name}</td>
                 <td className="p-3">{m.start_date}</td>
                 <td className="p-3">{m.end_date}</td>
-                <td className="p-3">{m.status}</td>
-                <td className="p-3"><div className="flex gap-2">{canWrite && <button className="rounded border px-2 py-1" onClick={() => { setEditing(m); setForm({ member_id: m.member_id, plan_id: m.plan_id, start_date: m.start_date, end_date: m.end_date, status: m.status, auto_renew: Number(m.auto_renew) }); setOpen(true); }}>Editar</button>}{canDelete && <button className="rounded border border-red-300 px-2 py-1 text-red-700" onClick={async () => { if (!window.confirm('Eliminar membresía?')) return; await deleteMembership(m.id); load(meta.page); }}>Eliminar</button>}</div></td>
+                <td className="p-3">
+                  <span
+                    className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${statusClass(m.status)}`}
+                  >
+                    {statusLabel(m.status)}
+                  </span>
+                </td>
+                <td className="p-3">
+                  <div className="flex gap-2">
+                    {canWrite && (
+                      <button
+                        className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium transition hover:bg-slate-50"
+                        onClick={() => {
+                          setEditing(m);
+                          setForm({
+                            member_id: m.member_id,
+                            plan_id: m.plan_id,
+                            start_date: m.start_date,
+                            end_date: m.end_date,
+                            status: m.status,
+                            auto_renew: Number(m.auto_renew)
+                          });
+                          setOpen(true);
+                        }}
+                      >
+                        Editar
+                      </button>
+                    )}
+                    {canDelete && (
+                      <button
+                        className="rounded-lg border border-red-300 px-3 py-1.5 text-xs font-medium text-red-700 transition hover:bg-red-50"
+                        onClick={async () => {
+                          if (!window.confirm('Eliminar membresía?')) return;
+                          await deleteMembership(m.id);
+                          load(meta.page);
+                        }}
+                      >
+                        Eliminar
+                      </button>
+                    )}
+                  </div>
+                </td>
               </tr>
             ))}
           </tbody>
@@ -99,18 +188,73 @@ export default function MembershipsPage() {
 
       {open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <form onSubmit={submit} className="grid w-full max-w-2xl gap-3 rounded-xl bg-white p-5 md:grid-cols-2">
-            <input className="rounded border p-2" type="number" placeholder="Member ID" value={form.member_id} onChange={(e) => setForm((s) => ({ ...s, member_id: Number(e.target.value) }))} required />
-            <input className="rounded border p-2" type="number" placeholder="Plan ID" value={form.plan_id} onChange={(e) => setForm((s) => ({ ...s, plan_id: Number(e.target.value) }))} required />
-            <input className="rounded border p-2" type="date" value={form.start_date} onChange={(e) => setForm((s) => ({ ...s, start_date: e.target.value }))} required />
-            <input className="rounded border p-2" type="date" value={form.end_date} onChange={(e) => setForm((s) => ({ ...s, end_date: e.target.value }))} required />
-            <select className="rounded border p-2" value={form.status} onChange={(e) => setForm((s) => ({ ...s, status: e.target.value }))}>
-              <option value="active">Activa</option><option value="expired">Vencida</option><option value="cancelled">Cancelada</option><option value="paused">Pausada</option>
+          <form
+            onSubmit={submit}
+            className="grid w-full max-w-2xl gap-3 rounded-2xl border border-slate-200 bg-white p-5 md:grid-cols-2"
+          >
+            <input
+              className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+              type="number"
+              placeholder="Member ID"
+              value={form.member_id}
+              onChange={(e) => setForm((s) => ({ ...s, member_id: Number(e.target.value) }))}
+              required
+            />
+            <input
+              className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+              type="number"
+              placeholder="Plan ID"
+              value={form.plan_id}
+              onChange={(e) => setForm((s) => ({ ...s, plan_id: Number(e.target.value) }))}
+              required
+            />
+            <input
+              className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+              type="date"
+              value={form.start_date}
+              onChange={(e) => setForm((s) => ({ ...s, start_date: e.target.value }))}
+              required
+            />
+            <input
+              className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+              type="date"
+              value={form.end_date}
+              onChange={(e) => setForm((s) => ({ ...s, end_date: e.target.value }))}
+              required
+            />
+            <select
+              className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+              value={form.status}
+              onChange={(e) => setForm((s) => ({ ...s, status: e.target.value }))}
+            >
+              <option value="active">Activa</option>
+              <option value="expired">Vencida</option>
+              <option value="cancelled">Cancelada</option>
+              <option value="paused">Pausada</option>
             </select>
-            <select className="rounded border p-2" value={form.auto_renew} onChange={(e) => setForm((s) => ({ ...s, auto_renew: Number(e.target.value) }))}>
-              <option value={0}>Sin renovación automática</option><option value={1}>Renovación automática</option>
+            <select
+              className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+              value={form.auto_renew}
+              onChange={(e) => setForm((s) => ({ ...s, auto_renew: Number(e.target.value) }))}
+            >
+              <option value={0}>Sin renovación automática</option>
+              <option value={1}>Renovación automática</option>
             </select>
-            <div className="md:col-span-2 flex justify-end gap-2"><button type="button" className="rounded border px-4 py-2" onClick={() => setOpen(false)}>Cancelar</button><button type="submit" className="rounded bg-brand-600 px-4 py-2 text-white">Guardar</button></div>
+            <div className="flex justify-end gap-2 md:col-span-2">
+              <button
+                type="button"
+                className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                onClick={() => setOpen(false)}
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700"
+              >
+                Guardar
+              </button>
+            </div>
           </form>
         </div>
       )}
