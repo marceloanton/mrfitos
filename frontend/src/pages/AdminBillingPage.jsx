@@ -65,7 +65,8 @@ const TRACKING_EVENTS = [
   { key: 'upgrade_pay_now_click', label: 'Pay now click' },
   { key: 'upgrade_recommended_cta_click', label: 'Recommended CTA click' },
   { key: 'sales_pitch_copy_tenant', label: 'Pitch copy tenant' },
-  { key: 'sales_pitch_copy_segment', label: 'Pitch copy segment' }
+  { key: 'sales_pitch_copy_segment', label: 'Pitch copy segment' },
+  { key: 'sales_focus_tenant', label: 'Tenant focus' }
 ];
 const MIN_SAMPLE_CHECKOUTS = 10;
 const RECOMMENDED_CTA_FLOWS = [
@@ -93,7 +94,8 @@ function normalizeTrackingSummary(payload) {
       upgrade_pay_now_click: toInt(totals?.upgrade_pay_now_click ?? 0),
       upgrade_recommended_cta_click: toInt(totals?.upgrade_recommended_cta_click ?? 0),
       sales_pitch_copy_tenant: toInt(totals?.sales_pitch_copy_tenant ?? 0),
-      sales_pitch_copy_segment: toInt(totals?.sales_pitch_copy_segment ?? 0)
+      sales_pitch_copy_segment: toInt(totals?.sales_pitch_copy_segment ?? 0),
+      sales_focus_tenant: toInt(totals?.sales_focus_tenant ?? 0)
     },
     daily,
     byContext: payload?.by_context ?? {},
@@ -108,7 +110,8 @@ function buildCompositeKpi(funnelData, trackingData) {
     toInt(trackingData?.totals?.upgrade_pay_now_click) +
     toInt(trackingData?.totals?.upgrade_recommended_cta_click) +
     toInt(trackingData?.totals?.sales_pitch_copy_tenant) +
-    toInt(trackingData?.totals?.sales_pitch_copy_segment);
+    toInt(trackingData?.totals?.sales_pitch_copy_segment) +
+    toInt(trackingData?.totals?.sales_focus_tenant);
   const checkoutSessions = toInt(funnelData?.total_sessions);
   const approved = toInt(funnelData?.approved_sessions);
   const ctrUpgrade = checkoutSessions > 0 ? (clicks / checkoutSessions) * 100 : 0;
@@ -128,7 +131,8 @@ function buildContextKpi(contextTotals = {}) {
     toInt(contextTotals?.upgrade_pay_now_click) +
     toInt(contextTotals?.upgrade_recommended_cta_click) +
     toInt(contextTotals?.sales_pitch_copy_tenant) +
-    toInt(contextTotals?.sales_pitch_copy_segment);
+    toInt(contextTotals?.sales_pitch_copy_segment) +
+    toInt(contextTotals?.sales_focus_tenant);
   const checkoutSessions = toInt(contextTotals?.checkout_created);
   const approved = toInt(contextTotals?.approved);
   const ctrUpgrade = checkoutSessions > 0 ? (clicks / checkoutSessions) * 100 : 0;
