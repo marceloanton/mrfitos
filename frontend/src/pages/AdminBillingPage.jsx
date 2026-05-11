@@ -151,6 +151,17 @@ function buildCommercialRecommendation(row) {
   return { code: 'addon_whatsapp', label: 'Ofrecer Add-on WhatsApp', tone: 'bg-emerald-100 text-emerald-800' };
 }
 
+function buildOfferPitch(row, recommendation) {
+  const tenantName = row?.tenant_name ?? `Tenant ${row?.tenant_id ?? '-'}`;
+  if (recommendation.code === 'plan_scale') {
+    return `Hola ${tenantName}, vimos alto interés en crecimiento y operación. Te recomendamos pasar a Plan Scale para escalar sedes, usuarios y volumen sin fricción. ¿Querés que te active una propuesta hoy?`;
+  }
+  if (recommendation.code === 'plan_pro') {
+    return `Hola ${tenantName}, detectamos oportunidad clara para mejorar conversión y operación diaria. Te sugerimos Plan Pro para desbloquear automatizaciones y reportes clave. ¿Te comparto la propuesta ahora?`;
+  }
+  return `Hola ${tenantName}, para acelerar cobranzas y recordatorios te recomendamos activar el Add-on WhatsApp. Es el paso más rápido para subir respuesta y pagos. ¿Lo activamos hoy?`;
+}
+
 export default function AdminBillingPage() {
   const today = new Date().toISOString().slice(0, 10);
   const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10);
@@ -316,6 +327,27 @@ export default function AdminBillingPage() {
       new Blob([content], { type: 'text/csv;charset=utf-8;' }),
       `billing_offer_segment_${offerFilter}_${new Date().toISOString().slice(0, 10)}.csv`
     );
+  };
+
+  const onCopyOfferSegmentPitch = async () => {
+    if (rankingRows.length === 0) return;
+    const topRows = rankingRows.slice(0, 10);
+    const lines = topRows.map((row) => {
+      const recommendation = buildCommercialRecommendation(row);
+      return `- Tenant ${row.tenant_id} (${row.tenant_name ?? `Tenant ${row.tenant_id}`}): ${recommendation.label}`;
+    });
+    const segmentLabel = offerFilter === 'all' ? 'todas las ofertas' : offerFilter;
+    const message = [
+      `Campaña comercial por segmento (${segmentLabel})`,
+      `Periodo: ${filters.from || '-'} a ${filters.to || '-'}`,
+      ...lines
+    ].join('\n');
+    setCampaignMessage(message);
+    try {
+      await navigator.clipboard.writeText(message);
+    } catch {
+      // non-blocking
+    }
   };
 
   const onExportSessions = async () => {
@@ -920,6 +952,13 @@ export default function AdminBillingPage() {
           >
             Exportar segmento oferta CSV
           </button>
+          <button
+            className="rounded border border-fuchsia-300 px-3 py-1 text-xs text-fuchsia-700 disabled:opacity-50"
+            disabled={rankingRows.length === 0}
+            onClick={onCopyOfferSegmentPitch}
+          >
+            Copiar guion segmento
+          </button>
           {highOpportunityRows.slice(0, 3).map((row) => (
             <button
               key={`quick-focus-${row.tenant_id}`}
@@ -991,13 +1030,29 @@ export default function AdminBillingPage() {
                       </span>
                     </td>
                     <td className="p-3">
-                      <button
-                        className="rounded border border-slate-300 px-2 py-1 text-xs text-slate-700 disabled:opacity-50"
-                        disabled={loading || trackingLoading}
-                        onClick={() => focusTenant(row.tenant_id)}
-                      >
-                        Ver detalle
-                      </button>
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          className="rounded border border-slate-300 px-2 py-1 text-xs text-slate-700 disabled:opacity-50"
+                          disabled={loading || trackingLoading}
+                          onClick={() => focusTenant(row.tenant_id)}
+                        >
+                          Ver detalle
+                        </button>
+                        <button
+                          className="rounded border border-fuchsia-300 px-2 py-1 text-xs text-fuchsia-700"
+                          onClick={async () => {
+                            const pitch = buildOfferPitch(row, recommendation);
+                            try {
+                              await navigator.clipboard.writeText(pitch);
+                            } catch {
+                              // non-blocking
+                            }
+                            setCampaignMessage(pitch);
+                          }}
+                        >
+                          Copiar guion
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 )})
