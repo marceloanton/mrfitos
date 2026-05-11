@@ -77,6 +77,7 @@ const RECOMMENDED_CTA_FLOWS = [
   { key: 'addon_whatsapp', label: 'Add-on WhatsApp' }
 ];
 const OPPORTUNITY_PREFS_KEY = 'admin-billing-opportunity-prefs-v1';
+const SALES_LAST_RESET_KEY = 'admin-billing-sales-last-reset-v1';
 
 function normalizeTrackingSummary(payload) {
   const totals = payload?.event_totals ?? payload?.totals ?? payload?.events ?? {};
@@ -218,6 +219,7 @@ export default function AdminBillingPage() {
   const [rankingSortBy, setRankingSortBy] = useState('score');
   const [rankingSortDir, setRankingSortDir] = useState('desc');
   const [offerFilter, setOfferFilter] = useState('all');
+  const [lastSalesResetAt, setLastSalesResetAt] = useState('');
 
   const applyQuickRange = (days) => {
     const safeDays = Math.max(1, Number(days || 1));
@@ -579,6 +581,13 @@ export default function AdminBillingPage() {
 
   const resetSalesDay = async () => {
     setCampaignMessage('');
+    const nowIso = new Date().toISOString();
+    setLastSalesResetAt(nowIso);
+    try {
+      localStorage.setItem(SALES_LAST_RESET_KEY, nowIso);
+    } catch {
+      // non-blocking persistence
+    }
     trackEvent('sales_day_reset', 'admin_billing', {
       had_tenant_focus: hasTenantFilter,
       date_from: filters.from || null,
@@ -616,6 +625,17 @@ export default function AdminBillingPage() {
       // ignore invalid persisted prefs
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(SALES_LAST_RESET_KEY);
+      if (raw) {
+        setLastSalesResetAt(String(raw));
+      }
+    } catch {
+      // non-blocking read
+    }
   }, []);
 
   useEffect(() => {
@@ -835,6 +855,11 @@ export default function AdminBillingPage() {
         >
           Reset comercial del día
         </button>
+        {lastSalesResetAt && (
+          <p className="rounded bg-slate-100 px-3 py-1 text-xs text-slate-600">
+            Último reset: {new Date(lastSalesResetAt).toLocaleString()}
+          </p>
+        )}
       </div>
       <div className="flex flex-wrap gap-2 rounded-xl bg-white p-3 shadow-sm">
         <button className="rounded border border-slate-300 px-3 py-1 text-xs disabled:opacity-50" disabled={loading} onClick={() => applyQuickRange(7)}>
