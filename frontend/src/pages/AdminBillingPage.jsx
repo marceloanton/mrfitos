@@ -168,6 +168,7 @@ export default function AdminBillingPage() {
   const [tenantRanking, setTenantRanking] = useState([]);
   const [showOnlyHighOpportunity, setShowOnlyHighOpportunity] = useState(false);
   const [campaignMessage, setCampaignMessage] = useState('');
+  const [opportunityThreshold, setOpportunityThreshold] = useState(60);
 
   const applyQuickRange = (days) => {
     const safeDays = Math.max(1, Number(days || 1));
@@ -449,11 +450,11 @@ export default function AdminBillingPage() {
   const rankingRows = useMemo(() => {
     const sorted = [...tenantRanking].sort((a, b) => buildOpportunityScore(b) - buildOpportunityScore(a));
     if (!showOnlyHighOpportunity) return sorted;
-    return sorted.filter((row) => buildOpportunityScore(row) >= 60);
-  }, [tenantRanking, showOnlyHighOpportunity]);
+    return sorted.filter((row) => buildOpportunityScore(row) >= opportunityThreshold);
+  }, [tenantRanking, showOnlyHighOpportunity, opportunityThreshold]);
   const highOpportunityRows = useMemo(
-    () => tenantRanking.filter((row) => buildOpportunityScore(row) >= 60),
-    [tenantRanking]
+    () => tenantRanking.filter((row) => buildOpportunityScore(row) >= opportunityThreshold),
+    [tenantRanking, opportunityThreshold]
   );
   const highOpportunitySummary = useMemo(() => {
     if (highOpportunityRows.length === 0) return null;
@@ -695,8 +696,21 @@ export default function AdminBillingPage() {
             onChange={(e) => setShowOnlyHighOpportunity(e.target.checked)}
           />
           <label htmlFor="only-high-opportunity" className="text-sm text-slate-700">
-            Mostrar solo alta oportunidad (score ≥ 60)
+            Mostrar solo alta oportunidad (score ≥ {opportunityThreshold})
           </label>
+          <label htmlFor="opportunity-threshold" className="text-xs text-slate-600">
+            Umbral
+          </label>
+          <input
+            id="opportunity-threshold"
+            type="range"
+            min={40}
+            max={90}
+            step={5}
+            value={opportunityThreshold}
+            onChange={(e) => setOpportunityThreshold(Number(e.target.value))}
+          />
+          <span className="rounded bg-slate-100 px-2 py-1 text-xs text-slate-700">{opportunityThreshold}</span>
           <button
             className="rounded border border-slate-300 px-3 py-1 text-xs disabled:opacity-50"
             disabled={highOpportunityRows.length === 0}
@@ -774,7 +788,7 @@ export default function AdminBillingPage() {
               ) : (
                 rankingRows.map((row) => {
                   const score = buildOpportunityScore(row);
-                  const highOpportunity = score >= 60;
+                  const highOpportunity = score >= opportunityThreshold;
                   return (
                   <tr key={row.tenant_id} className={`border-t border-slate-100 ${highOpportunity ? 'bg-amber-50/50' : ''}`}>
                     <td className="p-3">{row.tenant_id}</td>
