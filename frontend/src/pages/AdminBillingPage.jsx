@@ -52,6 +52,12 @@ function toMoney(amount, currency = 'USD') {
   return `${currency} ${num.toFixed(2)}`;
 }
 
+function csvSafe(value) {
+  const raw = String(value ?? '');
+  const escaped = raw.replace(/"/g, '""');
+  return `"${escaped}"`;
+}
+
 const TRACKING_EVENTS = [
   { key: 'upgrade_banner_click', label: 'Banner click' },
   { key: 'upgrade_badge_click', label: 'Badge click' },
@@ -206,6 +212,38 @@ export default function AdminBillingPage() {
     anchor.download = filename;
     anchor.click();
     URL.revokeObjectURL(url);
+  };
+
+  const onExportHighOpportunityCsv = () => {
+    if (highOpportunityRows.length === 0) return;
+    const sorted = [...highOpportunityRows].sort((a, b) => buildOpportunityScore(b) - buildOpportunityScore(a));
+    const headers = [
+      'tenant_id',
+      'tenant_name',
+      'score',
+      'clicks',
+      'checkout_sessions',
+      'approved_sessions',
+      'checkout_to_approved_rate',
+      'click_to_approved_rate',
+      'partial_historical_data'
+    ];
+    const rowsCsv = sorted.map((row) => [
+      row.tenant_id,
+      row.tenant_name ?? `Tenant ${row.tenant_id}`,
+      buildOpportunityScore(row),
+      row.clicks ?? 0,
+      row.checkout_sessions ?? 0,
+      row.approved_sessions ?? 0,
+      Number(row.checkout_to_approved_rate ?? 0).toFixed(2),
+      Number(row.click_to_approved_rate ?? 0).toFixed(2),
+      row.partial_historical_data ? 'yes' : 'no'
+    ]);
+    const content = [
+      headers.map(csvSafe).join(','),
+      ...rowsCsv.map((line) => line.map(csvSafe).join(','))
+    ].join('\n');
+    downloadBlob(new Blob([content], { type: 'text/csv;charset=utf-8;' }), `billing_high_opportunity_${new Date().toISOString().slice(0, 10)}.csv`);
   };
 
   const onExportSessions = async () => {
@@ -661,6 +699,13 @@ export default function AdminBillingPage() {
             }}
           >
             Copiar plan comercial
+          </button>
+          <button
+            className="rounded border border-sky-300 px-3 py-1 text-xs text-sky-700 disabled:opacity-50"
+            disabled={highOpportunityRows.length === 0}
+            onClick={onExportHighOpportunityCsv}
+          >
+            Exportar alta oportunidad CSV
           </button>
           {highOpportunityRows.slice(0, 3).map((row) => (
             <button
