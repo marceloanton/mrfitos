@@ -169,6 +169,21 @@ export default function AdminBillingPage() {
   const [showOnlyHighOpportunity, setShowOnlyHighOpportunity] = useState(false);
   const [campaignMessage, setCampaignMessage] = useState('');
 
+  const applyQuickRange = (days) => {
+    const safeDays = Math.max(1, Number(days || 1));
+    const end = new Date();
+    const start = new Date();
+    start.setDate(end.getDate() - (safeDays - 1));
+    const next = {
+      ...filters,
+      from: start.toISOString().slice(0, 10),
+      to: end.toISOString().slice(0, 10),
+      page: 1
+    };
+    setFilters(next);
+    void Promise.all([loadData(next), loadTrackingSummary(next), loadGlobalComposite(next), loadTenantRanking(next)]);
+  };
+
   const cards = useMemo(() => {
     const conversion = Number.isFinite(funnel.approval_rate) ? funnel.approval_rate : 0;
     return [
@@ -507,6 +522,17 @@ export default function AdminBillingPage() {
         </select>
         <button className="rounded border border-slate-300 p-2 disabled:opacity-50" disabled={loading} onClick={onSubmitFilters}>
           {loading ? 'Consultando...' : 'Consultar'}
+        </button>
+      </div>
+      <div className="flex flex-wrap gap-2 rounded-xl bg-white p-3 shadow-sm">
+        <button className="rounded border border-slate-300 px-3 py-1 text-xs disabled:opacity-50" disabled={loading} onClick={() => applyQuickRange(7)}>
+          Ultimos 7 dias
+        </button>
+        <button className="rounded border border-slate-300 px-3 py-1 text-xs disabled:opacity-50" disabled={loading} onClick={() => applyQuickRange(30)}>
+          Ultimos 30 dias
+        </button>
+        <button className="rounded border border-slate-300 px-3 py-1 text-xs disabled:opacity-50" disabled={loading} onClick={() => applyQuickRange(90)}>
+          Ultimos 90 dias
         </button>
       </div>
 
