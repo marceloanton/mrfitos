@@ -170,6 +170,8 @@ export default function AdminBillingPage() {
   const [showOnlyHighOpportunity, setShowOnlyHighOpportunity] = useState(false);
   const [campaignMessage, setCampaignMessage] = useState('');
   const [opportunityThreshold, setOpportunityThreshold] = useState(60);
+  const [rankingSortBy, setRankingSortBy] = useState('score');
+  const [rankingSortDir, setRankingSortDir] = useState('desc');
 
   const applyQuickRange = (days) => {
     const safeDays = Math.max(1, Number(days || 1));
@@ -483,10 +485,23 @@ export default function AdminBillingPage() {
     [trackingSummary.rawTotals]
   );
   const rankingRows = useMemo(() => {
-    const sorted = [...tenantRanking].sort((a, b) => buildOpportunityScore(b) - buildOpportunityScore(a));
+    const sorted = [...tenantRanking].sort((a, b) => {
+      const scoreA = buildOpportunityScore(a);
+      const scoreB = buildOpportunityScore(b);
+      const mapValue = (row, score) => {
+        if (rankingSortBy === 'clicks') return Number(row.clicks ?? 0);
+        if (rankingSortBy === 'checkouts') return Number(row.checkout_sessions ?? 0);
+        if (rankingSortBy === 'approved') return Number(row.approved_sessions ?? 0);
+        if (rankingSortBy === 'checkout_to_approved_rate') return Number(row.checkout_to_approved_rate ?? 0);
+        return score;
+      };
+      const valueA = mapValue(a, scoreA);
+      const valueB = mapValue(b, scoreB);
+      return rankingSortDir === 'asc' ? valueA - valueB : valueB - valueA;
+    });
     if (!showOnlyHighOpportunity) return sorted;
     return sorted.filter((row) => buildOpportunityScore(row) >= opportunityThreshold);
-  }, [tenantRanking, showOnlyHighOpportunity, opportunityThreshold]);
+  }, [tenantRanking, showOnlyHighOpportunity, opportunityThreshold, rankingSortBy, rankingSortDir]);
   const highOpportunityRows = useMemo(
     () => tenantRanking.filter((row) => buildOpportunityScore(row) >= opportunityThreshold),
     [tenantRanking, opportunityThreshold]
@@ -755,6 +770,25 @@ export default function AdminBillingPage() {
             onChange={(e) => setOpportunityThreshold(Number(e.target.value))}
           />
           <span className="rounded bg-slate-100 px-2 py-1 text-xs text-slate-700">{opportunityThreshold}</span>
+          <select
+            className="rounded border border-slate-300 px-2 py-1 text-xs"
+            value={rankingSortBy}
+            onChange={(e) => setRankingSortBy(e.target.value)}
+          >
+            <option value="score">Orden: Score</option>
+            <option value="clicks">Orden: Clicks</option>
+            <option value="checkouts">Orden: Checkouts</option>
+            <option value="approved">Orden: Approved</option>
+            <option value="checkout_to_approved_rate">Orden: Conv Checkout→Approved</option>
+          </select>
+          <select
+            className="rounded border border-slate-300 px-2 py-1 text-xs"
+            value={rankingSortDir}
+            onChange={(e) => setRankingSortDir(e.target.value)}
+          >
+            <option value="desc">DESC</option>
+            <option value="asc">ASC</option>
+          </select>
           <button
             className="rounded border border-slate-300 px-3 py-1 text-xs disabled:opacity-50"
             disabled={highOpportunityRows.length === 0}
