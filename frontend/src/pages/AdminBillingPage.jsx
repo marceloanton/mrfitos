@@ -612,9 +612,21 @@ export default function AdminBillingPage() {
     () => toInt(trackingSummary.byContext?.admin_billing?.checkout_created),
     [trackingSummary.byContext]
   );
+  const salesOpsFocusCount = useMemo(
+    () => toInt(trackingSummary.byContext?.admin_billing?.sales_focus_tenant),
+    [trackingSummary.byContext]
+  );
   const salesOpsActivationRate = useMemo(
     () => (salesOpsPitchCopies > 0 ? (salesOpsCheckoutCreated / salesOpsPitchCopies) * 100 : 0),
     [salesOpsPitchCopies, salesOpsCheckoutCreated]
+  );
+  const salesOpsFocusToPitchRate = useMemo(
+    () => (salesOpsFocusCount > 0 ? (salesOpsPitchCopies / salesOpsFocusCount) * 100 : 0),
+    [salesOpsFocusCount, salesOpsPitchCopies]
+  );
+  const salesOpsFocusToCheckoutRate = useMemo(
+    () => (salesOpsFocusCount > 0 ? (salesOpsCheckoutCreated / salesOpsFocusCount) * 100 : 0),
+    [salesOpsFocusCount, salesOpsCheckoutCreated]
   );
   const recommendedCtaKpis = useMemo(
     () =>
@@ -897,10 +909,13 @@ export default function AdminBillingPage() {
           <article className="rounded-lg border border-slate-200 p-3">
             <p className="text-sm text-slate-500">admin_billing (sales ops)</p>
             <p className="mt-1 text-sm text-slate-700">
-              Pitch copies: <span className="font-semibold">{salesOpsPitchCopies}</span> · Checkout: <span className="font-semibold">{salesOpsCheckoutCreated}</span>
+              Focus: <span className="font-semibold">{salesOpsFocusCount}</span> · Pitch: <span className="font-semibold">{salesOpsPitchCopies}</span> · Checkout: <span className="font-semibold">{salesOpsCheckoutCreated}</span>
             </p>
             <p className="mt-2 text-sm text-slate-600">
               Activación comercial: {salesOpsActivationRate.toFixed(2)}%
+            </p>
+            <p className="mt-1 text-xs text-slate-500">
+              Focus→Pitch: {salesOpsFocusToPitchRate.toFixed(2)}% · Focus→Checkout: {salesOpsFocusToCheckoutRate.toFixed(2)}%
             </p>
             {salesOpsContextKpi.lowSample && (
               <p className="mt-2 rounded bg-amber-50 px-2 py-1 text-xs text-amber-800">
