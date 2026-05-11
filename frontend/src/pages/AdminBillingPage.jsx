@@ -185,6 +185,7 @@ export default function AdminBillingPage() {
   const [opportunityThreshold, setOpportunityThreshold] = useState(60);
   const [rankingSortBy, setRankingSortBy] = useState('score');
   const [rankingSortDir, setRankingSortDir] = useState('desc');
+  const [offerFilter, setOfferFilter] = useState('all');
 
   const applyQuickRange = (days) => {
     const safeDays = Math.max(1, Number(days || 1));
@@ -276,6 +277,45 @@ export default function AdminBillingPage() {
       ...rowsCsv.map((line) => line.map(csvSafe).join(','))
     ].join('\n');
     downloadBlob(new Blob([content], { type: 'text/csv;charset=utf-8;' }), `billing_high_opportunity_${new Date().toISOString().slice(0, 10)}.csv`);
+  };
+
+  const onExportOfferSegmentCsv = () => {
+    if (rankingRows.length === 0) return;
+    const headers = [
+      'tenant_id',
+      'tenant_name',
+      'offer_code',
+      'offer_label',
+      'score',
+      'clicks',
+      'checkout_sessions',
+      'approved_sessions',
+      'checkout_to_approved_rate',
+      'click_to_approved_rate'
+    ];
+    const rowsCsv = rankingRows.map((row) => {
+      const recommendation = buildCommercialRecommendation(row);
+      return [
+        row.tenant_id,
+        row.tenant_name ?? `Tenant ${row.tenant_id}`,
+        recommendation.code,
+        recommendation.label,
+        buildOpportunityScore(row),
+        row.clicks ?? 0,
+        row.checkout_sessions ?? 0,
+        row.approved_sessions ?? 0,
+        Number(row.checkout_to_approved_rate ?? 0).toFixed(2),
+        Number(row.click_to_approved_rate ?? 0).toFixed(2)
+      ];
+    });
+    const content = [
+      headers.map(csvSafe).join(','),
+      ...rowsCsv.map((line) => line.map(csvSafe).join(','))
+    ].join('\n');
+    downloadBlob(
+      new Blob([content], { type: 'text/csv;charset=utf-8;' }),
+      `billing_offer_segment_${offerFilter}_${new Date().toISOString().slice(0, 10)}.csv`
+    );
   };
 
   const onExportSessions = async () => {
@@ -512,9 +552,12 @@ export default function AdminBillingPage() {
       const valueB = mapValue(b, scoreB);
       return rankingSortDir === 'asc' ? valueA - valueB : valueB - valueA;
     });
-    if (!showOnlyHighOpportunity) return sorted;
-    return sorted.filter((row) => buildOpportunityScore(row) >= opportunityThreshold);
-  }, [tenantRanking, showOnlyHighOpportunity, opportunityThreshold, rankingSortBy, rankingSortDir]);
+    const byOpportunity = showOnlyHighOpportunity
+      ? sorted.filter((row) => buildOpportunityScore(row) >= opportunityThreshold)
+      : sorted;
+    if (offerFilter === 'all') return byOpportunity;
+    return byOpportunity.filter((row) => buildCommercialRecommendation(row).code === offerFilter);
+  }, [tenantRanking, showOnlyHighOpportunity, opportunityThreshold, rankingSortBy, rankingSortDir, offerFilter]);
   const highOpportunityRows = useMemo(
     () => tenantRanking.filter((row) => buildOpportunityScore(row) >= opportunityThreshold),
     [tenantRanking, opportunityThreshold]
@@ -824,6 +867,16 @@ export default function AdminBillingPage() {
             <option value="desc">DESC</option>
             <option value="asc">ASC</option>
           </select>
+          <select
+            className="rounded border border-slate-300 px-2 py-1 text-xs"
+            value={offerFilter}
+            onChange={(e) => setOfferFilter(e.target.value)}
+          >
+            <option value="all">Oferta: Todas</option>
+            <option value="plan_scale">Oferta: Plan Scale</option>
+            <option value="plan_pro">Oferta: Plan Pro</option>
+            <option value="addon_whatsapp">Oferta: Add-on WhatsApp</option>
+          </select>
           <button
             className="rounded border border-slate-300 px-3 py-1 text-xs disabled:opacity-50"
             disabled={highOpportunityRows.length === 0}
@@ -859,6 +912,13 @@ export default function AdminBillingPage() {
             onClick={onExportHighOpportunityCsv}
           >
             Exportar alta oportunidad CSV
+          </button>
+          <button
+            className="rounded border border-cyan-300 px-3 py-1 text-xs text-cyan-700 disabled:opacity-50"
+            disabled={rankingRows.length === 0}
+            onClick={onExportOfferSegmentCsv}
+          >
+            Exportar segmento oferta CSV
           </button>
           {highOpportunityRows.slice(0, 3).map((row) => (
             <button
