@@ -21,6 +21,26 @@ const emptyForm = {
   status: 'active'
 };
 
+const statusClass = (memberStatus) => {
+  switch (memberStatus) {
+    case 'active':
+      return 'bg-emerald-100 text-emerald-700';
+    case 'inactive':
+      return 'bg-slate-200 text-slate-700';
+    case 'frozen':
+      return 'bg-amber-100 text-amber-700';
+    default:
+      return 'bg-slate-100 text-slate-700';
+  }
+};
+
+const statusLabel = (memberStatus) => {
+  if (memberStatus === 'active') return 'Activo';
+  if (memberStatus === 'inactive') return 'Inactivo';
+  if (memberStatus === 'frozen') return 'Congelado';
+  return memberStatus;
+};
+
 export default function MembersPage() {
   const [items, setItems] = useState([]);
   const [meta, setMeta] = useState({ page: 1, per_page: 10, total: 0, total_pages: 1 });
@@ -133,13 +153,16 @@ export default function MembersPage() {
 
   return (
     <section className="space-y-4">
-      <div className="flex flex-col gap-3 rounded-xl bg-white p-4 shadow-sm md:flex-row md:items-center md:justify-between">
+      <div className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-gradient-to-r from-cyan-50 via-sky-50 to-white p-5 shadow-sm md:flex-row md:items-center md:justify-between">
         <div>
-          <h2 className="text-2xl font-semibold">Socios</h2>
-          <p className="text-sm text-slate-600">{totalLabel}</p>
+          <h2 className="text-2xl font-semibold text-slate-900">Socios</h2>
+          <p className="text-sm text-slate-600">Gestión diaria de altas, estado y contacto</p>
+          <p className="mt-1 text-xs font-medium uppercase tracking-wide text-slate-500">
+            {totalLabel}
+          </p>
         </div>
         <button
-          className="rounded-lg bg-brand-600 px-4 py-2 text-white"
+          className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-700"
           onClick={() => {
             setEditing(null);
             setForm(emptyForm);
@@ -150,15 +173,15 @@ export default function MembersPage() {
         </button>
       </div>
 
-      <div className="grid gap-3 rounded-xl bg-white p-4 shadow-sm md:grid-cols-4">
+      <div className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:grid-cols-4">
         <input
-          className="rounded-lg border border-slate-300 p-2 md:col-span-2"
+          className="rounded-lg border border-slate-300 px-3 py-2 text-sm md:col-span-2"
           placeholder="Buscar por nombre, código, email o teléfono"
           value={q}
           onChange={(e) => setQ(e.target.value)}
         />
         <select
-          className="rounded-lg border border-slate-300 p-2"
+          className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
           value={status}
           onChange={(e) => setStatus(e.target.value)}
         >
@@ -167,7 +190,10 @@ export default function MembersPage() {
           <option value="inactive">Inactivo</option>
           <option value="frozen">Congelado</option>
         </select>
-        <button className="rounded-lg border border-slate-300 p-2" onClick={() => load(1)}>
+        <button
+          className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium transition hover:bg-slate-50"
+          onClick={() => load(1)}
+        >
           Filtrar
         </button>
       </div>
@@ -180,7 +206,7 @@ export default function MembersPage() {
       />
       {error && <p className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}
 
-      <div className="overflow-x-auto rounded-xl bg-white shadow-sm">
+      <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
         <table className="min-w-full text-sm">
           <thead className="bg-slate-50 text-left text-slate-600">
             <tr>
@@ -203,14 +229,34 @@ export default function MembersPage() {
             ) : (
               items.map((member) => (
                 <tr key={member.id} className="border-t border-slate-100">
-                  <td className="p-3">{member.member_code}</td>
-                  <td className="p-3">{member.first_name} {member.last_name}</td>
-                  <td className="p-3 capitalize">{member.status}</td>
+                  <td className="p-3 font-medium text-slate-700">{member.member_code}</td>
+                  <td className="p-3">
+                    <span className="font-medium text-slate-900">
+                      {member.first_name} {member.last_name}
+                    </span>
+                  </td>
+                  <td className="p-3">
+                    <span
+                      className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${statusClass(member.status)}`}
+                    >
+                      {statusLabel(member.status)}
+                    </span>
+                  </td>
                   <td className="p-3">{member.email || member.phone || '-'}</td>
                   <td className="p-3">
                     <div className="flex gap-2">
-                      <button className="rounded border border-slate-300 px-2 py-1" onClick={() => onEdit(member)}>Editar</button>
-                      <button className="rounded border border-red-300 px-2 py-1 text-red-700" onClick={() => onDelete(member)}>Eliminar</button>
+                      <button
+                        className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium transition hover:bg-slate-50"
+                        onClick={() => onEdit(member)}
+                      >
+                        Editar
+                      </button>
+                      <button
+                        className="rounded-lg border border-red-300 px-3 py-1.5 text-xs font-medium text-red-700 transition hover:bg-red-50"
+                        onClick={() => onDelete(member)}
+                      >
+                        Eliminar
+                      </button>
                     </div>
                   </td>
                 </tr>
@@ -221,31 +267,111 @@ export default function MembersPage() {
       </div>
 
       <div className="flex items-center justify-end gap-2">
-        <button disabled={!canPrev} className="rounded border border-slate-300 px-3 py-1 disabled:opacity-50" onClick={() => load(meta.page - 1)}>Anterior</button>
+        <button
+          disabled={!canPrev}
+          className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium disabled:opacity-50"
+          onClick={() => load(meta.page - 1)}
+        >
+          Anterior
+        </button>
         <span className="text-sm text-slate-600">Página {meta.page} de {meta.total_pages}</span>
-        <button disabled={!canNext} className="rounded border border-slate-300 px-3 py-1 disabled:opacity-50" onClick={() => load(meta.page + 1)}>Siguiente</button>
+        <button
+          disabled={!canNext}
+          className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium disabled:opacity-50"
+          onClick={() => load(meta.page + 1)}
+        >
+          Siguiente
+        </button>
       </div>
 
       {open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <form onSubmit={onSubmit} className="grid w-full max-w-2xl gap-3 rounded-xl bg-white p-5 shadow-xl md:grid-cols-2">
-            <h3 className="md:col-span-2 text-xl font-semibold">{editing ? 'Editar socio' : 'Nuevo socio'}</h3>
-            <input className="rounded border p-2" placeholder="Código" value={form.member_code} disabled={Boolean(editing)} onChange={(e) => setForm((s) => ({ ...s, member_code: e.target.value }))} required />
-            <select className="rounded border p-2" value={form.status} onChange={(e) => setForm((s) => ({ ...s, status: e.target.value }))}>
+          <form
+            onSubmit={onSubmit}
+            className="grid w-full max-w-2xl gap-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-xl md:grid-cols-2"
+          >
+            <h3 className="text-xl font-semibold text-slate-900 md:col-span-2">
+              {editing ? 'Editar socio' : 'Nuevo socio'}
+            </h3>
+            <input
+              className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+              placeholder="Código"
+              value={form.member_code}
+              disabled={Boolean(editing)}
+              onChange={(e) => setForm((s) => ({ ...s, member_code: e.target.value }))}
+              required
+            />
+            <select
+              className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+              value={form.status}
+              onChange={(e) => setForm((s) => ({ ...s, status: e.target.value }))}
+            >
               <option value="active">Activo</option>
               <option value="inactive">Inactivo</option>
               <option value="frozen">Congelado</option>
             </select>
-            <input className="rounded border p-2" placeholder="Nombre" value={form.first_name} onChange={(e) => setForm((s) => ({ ...s, first_name: e.target.value }))} required />
-            <input className="rounded border p-2" placeholder="Apellido" value={form.last_name} onChange={(e) => setForm((s) => ({ ...s, last_name: e.target.value }))} required />
-            <input className="rounded border p-2" placeholder="Email" type="email" value={form.email} onChange={(e) => setForm((s) => ({ ...s, email: e.target.value }))} />
-            <input className="rounded border p-2" placeholder="Teléfono" value={form.phone} onChange={(e) => setForm((s) => ({ ...s, phone: e.target.value }))} />
-            <input className="rounded border p-2" placeholder="Fecha nacimiento" type="date" value={form.birth_date} onChange={(e) => setForm((s) => ({ ...s, birth_date: e.target.value }))} />
-            <input className="rounded border p-2" placeholder="Contacto emergencia" value={form.emergency_contact} onChange={(e) => setForm((s) => ({ ...s, emergency_contact: e.target.value }))} />
-            <textarea className="rounded border p-2 md:col-span-2" rows={3} placeholder="Observaciones" value={form.notes} onChange={(e) => setForm((s) => ({ ...s, notes: e.target.value }))} />
-            <div className="md:col-span-2 flex justify-end gap-2">
-              <button type="button" className="rounded border px-4 py-2" onClick={() => setOpen(false)}>Cancelar</button>
-              <button type="submit" className="rounded bg-brand-600 px-4 py-2 text-white" disabled={saving}>{saving ? 'Guardando...' : 'Guardar'}</button>
+            <input
+              className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+              placeholder="Nombre"
+              value={form.first_name}
+              onChange={(e) => setForm((s) => ({ ...s, first_name: e.target.value }))}
+              required
+            />
+            <input
+              className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+              placeholder="Apellido"
+              value={form.last_name}
+              onChange={(e) => setForm((s) => ({ ...s, last_name: e.target.value }))}
+              required
+            />
+            <input
+              className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+              placeholder="Email"
+              type="email"
+              value={form.email}
+              onChange={(e) => setForm((s) => ({ ...s, email: e.target.value }))}
+            />
+            <input
+              className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+              placeholder="Teléfono"
+              value={form.phone}
+              onChange={(e) => setForm((s) => ({ ...s, phone: e.target.value }))}
+            />
+            <input
+              className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+              placeholder="Fecha nacimiento"
+              type="date"
+              value={form.birth_date}
+              onChange={(e) => setForm((s) => ({ ...s, birth_date: e.target.value }))}
+            />
+            <input
+              className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+              placeholder="Contacto emergencia"
+              value={form.emergency_contact}
+              onChange={(e) => setForm((s) => ({ ...s, emergency_contact: e.target.value }))}
+            />
+            <textarea
+              className="rounded-lg border border-slate-300 px-3 py-2 text-sm md:col-span-2"
+              rows={3}
+              placeholder="Observaciones"
+              value={form.notes}
+              onChange={(e) => setForm((s) => ({ ...s, notes: e.target.value }))}
+            />
+            <div className="flex justify-end gap-2 md:col-span-2">
+              <button
+                type="button"
+                className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                onClick={() => setOpen(false)}
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700"
+                disabled={saving}
+              >
+                {saving ? 'Guardando...' : 'Guardar'}
+              </button>
             </div>
           </form>
         </div>
